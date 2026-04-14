@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Time Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * {
       margin: 0;
@@ -333,6 +334,12 @@
       gap: 16px;
     }
 
+    @media (max-width: 768px) {
+      .allocate-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .allocate-card {
       background: #1a1a1a;
       border: 0.5px solid #333;
@@ -411,6 +418,12 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .history-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .history-card {
@@ -692,6 +705,8 @@
       </div>
     </div>
   </div>
+
+  <!-- END DAY MODAL -->
   <div class="modal-overlay" id="end-day-modal">
     <div class="modal">
       <div class="modal-title" style="font-size: 24px; text-align: center;">👋 Day Complete</div>
@@ -712,24 +727,6 @@
       <div class="modal-buttons">
         <button class="btn-cancel" onclick="closeEndDayModal()">Keep going</button>
         <button style="background: #ef4444; color: #fff;" onclick="finishDay()">End day</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- RESUME SESSION MODAL -->
-  <div class="modal-overlay" id="resume-modal">
-    <div class="modal">
-      <div class="modal-title" style="font-size: 20px; text-align: center;">Resume session?</div>
-      <div style="background: #0f0f0f; border: 0.5px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 1.5rem; text-align: center; font-size: 14px;">
-        You stopped <span id="resume-date">Monday</span> at <span id="resume-time">8:00 PM</span>
-      </div>
-      <div class="modal-form-group">
-        <label class="modal-label">Reason (optional)</label>
-        <textarea id="resume-reason" placeholder="e.g. Extended session, had more work..." style="min-height: 80px;"></textarea>
-      </div>
-      <div class="modal-buttons">
-        <button class="btn-cancel" onclick="startNewSession()">New session</button>
-        <button class="btn-save" onclick="resumeSession()">Resume</button>
       </div>
     </div>
   </div>
@@ -775,6 +772,11 @@
   </div>
 
   <script>
+    // Supabase setup
+    const SUPABASE_URL = 'https://ffbdazepqrsyurhouxif.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmYmRhemVwcXJzeXVyaG91eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTM5MjIsImV4cCI6MjA5MDQ2OTkyMn0.BAuodLUDGzO9A7IfoRRn0HZ1MgWOXNPeYKPDBNaNWeg';
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     const state = {
       dayStarted: false,
       dayStartTime: null,
@@ -805,6 +807,74 @@
       return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
 
+    // Load history from Supabase
+    async function loadHistoryFromSupabase() {
+      try {
+        const { data, error } = await sbClient
+          .from('history')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          state.history = data.map(entry => ({
+            date: entry.date,
+            total: entry.total_time,
+            tasks: entry.tasks_count,
+            waste: '0m',
+            notes: entry.notes,
+          }));
+          renderHistoryTab();
+        }
+      } catch (err) {
+        console.error('Error loading history:', err);
+      }
+    }
+
+    // Load allocations from Supabase
+    async function loadAllocationsFromSupabase() {
+      try {
+        const { data, error } = await sbClient
+          .from('allocations')
+          .select('*');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          state.allocations = {};
+          data.forEach(alloc => {
+            state.allocations[alloc.category] = {
+              weekly: alloc.weekly_hours,
+              daily: alloc.daily_minimum,
+              color: alloc.color,
+            };
+          });
+          renderAllocateTab();
+        }
+      } catch (err) {
+        console.error('Error loading allocations:', err);
+      }
+    }
+
+    // Save allocations to Supabase
+    async function saveAllocationsToSupabase() {
+      try {
+        await sbClient.from('allocations').delete().neq('id', 0);
+        
+        const allocData = Object.entries(state.allocations).map(([category, alloc]) => ({
+          category,
+          weekly_hours: alloc.weekly,
+          daily_minimum: alloc.daily,
+          color: alloc.color,
+        }));
+
+        await sbClient.from('allocations').insert(allocData);
+      } catch (err) {
+        console.error('Error saving allocations:', err);
+      }
+    }
+
     function updateClock() {
       const now = new Date();
       document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', {
@@ -821,9 +891,7 @@
     function startDay() {
       const today = new Date().toDateString();
       
-      // Check if there's a session from today that was stopped
       if (state.lastSession && state.lastSession.date === today) {
-        // Show resume modal
         document.getElementById('resume-date').textContent = state.lastSession.date;
         document.getElementById('resume-time').textContent = state.lastSession.endTime;
         document.getElementById('resume-reason').value = '';
@@ -831,7 +899,6 @@
         return;
       }
 
-      // Start fresh session
       beginSession();
     }
 
@@ -984,11 +1051,17 @@
         notes: notes,
       });
 
-      // Track this session as the last one
+      // Save to Supabase
+      sbClient.from('history').insert({
+        date: dateStr,
+        total_time: formatTime(total),
+        tasks_count: count,
+        notes: notes,
+      }).catch(err => console.error('Error saving:', err));
+
       state.lastSession = {
         date: new Date().toDateString(),
         endTime: endTime,
-        resumeReason: null,
       };
 
       Object.values(state.tasks).forEach(task => {
@@ -1060,7 +1133,7 @@
         const item = document.createElement('div');
         item.className = 'category-item';
         item.innerHTML = `
-          <input type="color" value="${alloc.color}" onchange="state.allocations['${category}'].color = this.value;" style="width: 40px; height: 40px; border: 0; border-radius: 6px; cursor: pointer;" />
+          <input type="color" value="${alloc.color}" onchange="state.allocations['${category}'].color = this.value; saveAllocationsToSupabase();" style="width: 40px; height: 40px; border: 0; border-radius: 6px; cursor: pointer;" />
           <div class="category-item-name">${category}</div>
           <div style="display: flex; gap: 8px;">
             <button class="btn-edit" onclick="editCategory('${category}')">Edit</button>
@@ -1077,6 +1150,7 @@
         state.allocations[newName] = state.allocations[oldName];
         delete state.allocations[oldName];
         renderCategoriesList();
+        saveAllocationsToSupabase();
       }
     }
 
@@ -1084,6 +1158,7 @@
       if (Object.keys(state.allocations).length > 1) {
         delete state.allocations[category];
         renderCategoriesList();
+        saveAllocationsToSupabase();
       }
     }
 
@@ -1093,6 +1168,7 @@
       state.allocations[name] = { weekly: 5, daily: 0.5, color: '#999' };
       document.getElementById('new-category-name').value = '';
       renderCategoriesList();
+      saveAllocationsToSupabase();
     }
 
     function renderAllocateTab() {
@@ -1110,12 +1186,12 @@
           </div>
           <div class="allocate-row">
             <div class="allocate-label">Weekly target</div>
-            <input type="number" class="allocate-input" value="${alloc.weekly}" onchange="state.allocations['${category}'].weekly = parseFloat(this.value); updateAllocateSummary();" />
+            <input type="number" class="allocate-input" value="${alloc.weekly}" onchange="state.allocations['${category}'].weekly = parseFloat(this.value); updateAllocateSummary(); saveAllocationsToSupabase();" />
             <div class="allocate-unit">hours</div>
           </div>
           <div class="allocate-row">
             <div class="allocate-label">Daily minimum</div>
-            <input type="number" step="0.5" class="allocate-input" value="${alloc.daily}" onchange="state.allocations['${category}'].daily = parseFloat(this.value);" />
+            <input type="number" step="0.5" class="allocate-input" value="${alloc.daily}" onchange="state.allocations['${category}'].daily = parseFloat(this.value); saveAllocationsToSupabase();" />
             <div class="allocate-unit">hours</div>
           </div>
           <div class="allocate-row" style="border-top: 0.5px solid #333; margin-top: 12px; padding-top: 12px;">
@@ -1183,6 +1259,8 @@
     }
 
     updateClock();
+    loadHistoryFromSupabase();
+    loadAllocationsFromSupabase();
   </script>
 </body>
 </html>
