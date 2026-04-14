@@ -27,10 +27,10 @@
     .tab { padding: 12px 24px; background: transparent; border: none; color: #999; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; }
     .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
     
-    .content { display: none; }
+    .content { display: none; position: relative; }
     .content.active { display: block; }
     
-    .lock { position: fixed; top: 320px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 500; }
+    .lock { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
     .lock.active { display: flex; }
     .lock-box { text-align: center; }
     .lock-title { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #ec4899, #f97316, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 2rem; }
@@ -44,7 +44,7 @@
     .add-task input { flex: 1; }
     .btn-add { background: #3b82f6; color: #fff; padding: 12px 24px; cursor: pointer; border: none; }
     
-    .tiles { position: relative; width: 100%; height: 600px; background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; overflow: hidden; }
+    .tiles { position: relative; width: 100%; height: 1600px; background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; overflow: auto; }
     .tile { position: absolute; width: 280px; padding: 20px; border-radius: 12px; border: 1px solid; display: flex; flex-direction: column; min-height: 200px; cursor: grab; user-select: none; }
     .tile:active { cursor: grabbing; }
     .tile.dragging { box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 1000; }
@@ -121,13 +121,6 @@
 
     <!-- TRACKER TAB -->
     <div id="tracker" class="content active">
-      <div class="lock active" id="lock">
-        <div class="lock-box">
-          <div class="lock-title">Ready to start your day?</div>
-          <button class="lock-btn" onclick="startDay()">Let's go</button>
-        </div>
-      </div>
-
       <div class="add-task">
         <input type="text" id="task-name" placeholder="Task name" />
         <select id="task-cat">
@@ -141,7 +134,14 @@
         <button class="btn-add" onclick="addTask()">+ Add</button>
       </div>
 
-      <div class="tiles" id="tiles"></div>
+      <div class="tiles" id="tiles">
+        <div class="lock" id="lock">
+          <div class="lock-box">
+            <div class="lock-title">Ready to start your day?</div>
+            <button class="lock-btn" onclick="startDay()">Let's go</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ALLOCATE TAB -->
@@ -279,7 +279,7 @@
 
     function startDay() {
       app.dayStarted = true;
-      document.getElementById('lock').classList.remove('active');
+      document.getElementById('lock').style.display = 'none';
       document.getElementById('stop-btn').disabled = false;
       loadTasks();
       updateTime();
@@ -331,9 +331,7 @@
         select.appendChild(option);
       });
       
-      if(document.getElementById('tiles').innerHTML === '') {
-        renderTiles();
-      }
+      renderTiles();
     }
 
     function addTask() {
@@ -360,45 +358,26 @@
             daily:0
           };
           app.nextId = Math.max(app.nextId, t.id+1);
-          document.getElementById('task-name').value = '';
           
-          const tilesBox = document.getElementById('tiles');
-          const tile = document.createElement('div');
-          tile.className = `tile ${app.tasks[t.id].color}`;
-          
-          // Find next free grid position
-          let posX = 0, posY = 0;
-          let found = false;
-          const GRID = 50;
-          const TILE_W = 280;
-          const TILE_H = 200;
-          const MAX_X = 1000;
-          
-          while(!found) {
-            let collision = false;
-            // Check if this position collides with any existing tile
-            Object.values(app.tasks).forEach(existing => {
-              if(existing.id !== t.id) {
-                const xOverlap = posX < existing.x + TILE_W && posX + TILE_W > existing.x;
-                const yOverlap = posY < existing.y + TILE_H && posY + TILE_H > existing.y;
-                if(xOverlap && yOverlap) collision = true;
-              }
-            });
-            
-            if(!collision) {
-              found = true;
-            } else {
-              posX += GRID * 6; // Move 300px right
-              if(posX > MAX_X) {
-                posX = 0;
-                posY += GRID * 4; // Move 200px down
-              }
-            }
-          }
+          // Assign grid position based on task count
+          const taskIndex = Object.keys(app.tasks).length - 1;
+          const COLS = 3;
+          const TILE_W = 300;
+          const TILE_H = 350;
+          const col = taskIndex % COLS;
+          const row = Math.floor(taskIndex / COLS);
+          const posX = col * TILE_W;
+          const posY = row * TILE_H;
           
           app.tasks[t.id].x = posX;
           app.tasks[t.id].y = posY;
           
+          document.getElementById('task-name').value = '';
+          
+          // Add tile to DOM
+          const tilesBox = document.getElementById('tiles');
+          const tile = document.createElement('div');
+          tile.className = `tile ${app.tasks[t.id].color}`;
           tile.style.left = posX + 'px';
           tile.style.top = posY + 'px';
           tile.dataset.id = t.id;
@@ -422,25 +401,40 @@
             </div>
           `;
           tilesBox.appendChild(tile);
+          
+          // Save position to Supabase
+          SB.from('tasks').update({pos_x:posX, pos_y:posY}).eq('id', t.id).catch(e => console.error(e));
         }
       });
     }
 
     function renderTiles() {
       const box = document.getElementById('tiles');
+      const lock = box.querySelector('.lock');
       box.innerHTML = '';
-      Object.entries(app.tasks).forEach(([id, t]) => {
-        // Snap to grid on render
-        const GRID = 50;
-        const snappedX = Math.round(t.x / GRID) * GRID;
-        const snappedY = Math.round(t.y / GRID) * GRID;
-        t.x = snappedX;
-        t.y = snappedY;
+      if(lock) box.appendChild(lock);
+      
+      const COLS = 3;
+      const TILE_W = 300;
+      const TILE_H = 350;
+      
+      const taskArray = Object.entries(app.tasks).sort((a, b) => a[0] - b[0]);
+      taskArray.forEach((entry, idx) => {
+        const [id, t] = entry;
+        
+        // Calculate grid position based on index
+        const col = idx % COLS;
+        const row = Math.floor(idx / COLS);
+        const posX = col * TILE_W;
+        const posY = row * TILE_H;
+        
+        t.x = posX;
+        t.y = posY;
         
         const tile = document.createElement('div');
         tile.className = `tile ${t.color}`;
-        tile.style.left = snappedX + 'px';
-        tile.style.top = snappedY + 'px';
+        tile.style.left = posX + 'px';
+        tile.style.top = posY + 'px';
         tile.dataset.id = id;
         tile.innerHTML = `
           <div class="tile-head">
@@ -490,9 +484,52 @@
         document.removeEventListener('mouseup', end);
         
         if(moved) {
-          const GRID = 50;
-          const snappedX = Math.round(app.tasks[id].x / GRID) * GRID;
-          const snappedY = Math.round(app.tasks[id].y / GRID) * GRID;
+          const COLS = 3;
+          const TILE_W = 300;
+          const TILE_H = 350;
+          
+          // Convert to grid coordinates
+          let col = Math.round(app.tasks[id].x / TILE_W);
+          let row = Math.round(app.tasks[id].y / TILE_H);
+          
+          // Clamp to valid range
+          col = Math.max(0, Math.min(col, COLS - 1));
+          row = Math.max(0, row);
+          
+          // Find next available slot (check for occupied)
+          let found = false;
+          let testRow = row;
+          let testCol = col;
+          
+          while(!found) {
+            const testX = testCol * TILE_W;
+            const testY = testRow * TILE_H;
+            
+            // Check if this slot is occupied by another task
+            let occupied = false;
+            Object.entries(app.tasks).forEach(([otherId, other]) => {
+              if(otherId != id && other.x === testX && other.y === testY) {
+                occupied = true;
+              }
+            });
+            
+            if(!occupied) {
+              found = true;
+              col = testCol;
+              row = testRow;
+            } else {
+              // Try next column in row
+              testCol++;
+              if(testCol >= COLS) {
+                testCol = 0;
+                testRow++;
+              }
+            }
+          }
+          
+          const snappedX = col * TILE_W;
+          const snappedY = row * TILE_H;
+          
           app.tasks[id].x = snappedX;
           app.tasks[id].y = snappedY;
           tile.style.left = snappedX + 'px';
@@ -890,6 +927,7 @@
     }
 
     updateTime();
+    document.getElementById('lock').style.display = 'flex';
     loadTasks();
   </script>
 </body>
