@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time Tracker</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
+
+    body { 
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 0.5rem; }
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 768px) {
+      .container { max-width: 100%; }
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .header-date {
+      font-size: 14px;
+      color: #999;
+    }
+
+    .header-time {
+      font-size: 24px;
+      font-weight: 600;
+      font-family: monospace;
+      letter-spacing: 1px;
+    }
+
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-stop {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-settings {
+      background: #1a1a1a;
+      color: #e5e5e5;
+      border: 0.5px solid #333;
+    }
+
+    .tab-bar {
+      display: flex;
+      border-bottom: 0.5px solid #333;
+      margin-bottom: 2rem;
+      gap: 0;
+    }
+
+    .tab-btn {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #999;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab-btn.active {
+      color: #60a5fa;
+      border-bottom-color: #60a5fa;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tracker-lock {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      border-radius: 12px;
+    }
+
+    .tracker-lock.active {
+      display: flex;
+    }
+
+    #tracker {
+      position: relative;
+    }
+
+    .start-day-modal {
+      text-align: center;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .start-day-title {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #ec4899 0%, #f97316 50%, #fbbf24 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .start-day-button {
+      padding: 20px 60px;
+      font-size: 18px;
+      background: #10b981;
+      color: #fff;
+      margin-top: 4rem;
+    }
+
+    .add-task-section {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    input, select {
+      background: #1a1a1a;
+      color: #e5e5e5;
+      border: 0.5px solid #333;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    .add-task-section input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .btn-add {
+      background: #3b82f6;
+      color: #fff;
+      padding: 12px 24px;
+    }
+
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .tiles-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tile {
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+      border: 1px solid;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .tile:hover { transform: translateY(-2px); }
+
+    .tile.blue { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); border-color: #3b82f6; }
+    .tile.green { background: linear-gradient(135deg, #1b4332 0%, #1f6e3a 100%); border-color: #10b981; }
+    .tile.purple { background: linear-gradient(135deg, #3f0f5c 0%, #581c87 100%); border-color: #a855f7; }
+    .tile.amber { background: linear-gradient(135deg, #78350f 0%, #92400e 100%); border-color: #f59e0b; }
+    .tile.coral { background: linear-gradient(135deg, #5a2a2a 0%, #7c2d12 100%); border-color: #f87171; }
+    .tile.pink { background: linear-gradient(135deg, #5a2f5a 0%, #831843 100%); border-color: #ec4899; }
+
+    .tile.running {
+      border-color: #60a5fa;
+      box-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+    }
+
+    .tile-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.8;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .tile-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      line-height: 1.3;
+      flex: 1;
+      color: #fff;
+    }
+
+    .tile-timer {
+      font-size: 42px;
+      font-weight: 700;
+      font-family: monospace;
+      margin: 12px 0;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    .tile-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .tile-buttons-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tile-btn-start {
+      background: #10b981;
+      border: 0;
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    .tile-btn-start:hover { background: #059669; }
+
+    .tile-btn-stop {
+      background: #ef4444;
+      border: 0;
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+    }
+
+    .tile-btn-stop:hover { background: #dc2626; }
+
+    .tile-btn-note {
+      width: 100%;
+      padding: 10px 16px;
+      border: 0.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .tile-btn-note:hover { background: rgba(255, 255, 255, 0.2); }
+
+    .allocate-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .allocate-card {
+      background: #1a1a1a;
+      border: 0.5px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .allocate-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e5e5e5;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .allocate-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .allocate-label {
+      font-size: 12px;
+      color: #999;
+      flex: 1;
+    }
+
+    .allocate-input {
+      width: 100px;
+      text-align: right;
+      font-family: monospace;
+    }
+
+    .allocate-unit {
+      font-size: 12px;
+      color: #999;
+      min-width: 40px;
+    }
+
+    .allocate-summary {
+      background: #1a1a1a;
+      border: 0.5px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 20px;
+    }
+
+    .allocate-summary-label {
+      font-size: 11px;
+      color: #999;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .allocate-summary-value {
+      font-size: 32px;
+      font-weight: 700;
+      font-family: monospace;
+      color: #60a5fa;
+    }
+
+    .history-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .history-card {
+      background: #1a1a1a;
+      border: 0.5px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .history-card-date {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e5e5e5;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-card-stat {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .history-card-label { color: #999; }
+    .history-card-value { color: #60a5fa; font-weight: 600; font-family: monospace; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1500;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: #1a1a1a;
+      border: 0.5px solid #333;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #e5e5e5;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: transparent;
+      border: 0;
+      color: #999;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .modal-form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      color: #999;
+    }
+
+    textarea {
+      width: 100%;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      border: 0.5px solid #333;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 1.5rem;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+      padding: 12px;
+    }
+
+    .btn-cancel {
+      background: #1a1a1a;
+      color: #e5e5e5;
+      border: 0.5px solid #333;
+    }
+
+    .btn-save {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .btn-delete {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 0;
+    }
+
+    .btn-edit {
+      background: #3b82f6;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 12px;
+      border: 0;
+      margin-right: 4px;
+    }
+
+    .category-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #0f0f0f;
+      border: 0.5px solid #333;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .category-item-name { flex: 1; color: #e5e5e5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⏱ Time Tracker</h1>
+      <div class="header-right">
+        <div class="header-date" id="current-date">Loading...</div>
+        <div class="header-time" id="day-timer">00:00</div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <div>
+        <button class="btn-stop" id="stop-day-btn" onclick="showEndDayModal()" disabled>Stop day</button>
+      </div>
+      <button class="btn-settings" onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('tracker')">Tracker</button>
+      <button class="tab-btn" onclick="switchTab('allocate')">Allocate</button>
+      <button class="tab-btn" onclick="switchTab('history')">History</button>
+    </div>
+
+    <!-- TRACKER TAB -->
+    <div id="tracker" class="tab-content active">
+      <div class="tracker-lock active" id="tracker-lock">
+        <div class="start-day-modal">
+          <div class="start-day-title">Ready to</div>
+          <div class="start-day-title">start your day?</div>
+          <button class="start-day-button" onclick="startDay()">Let's go</button>
+        </div>
+      </div>
+
+      <div class="add-task-section">
+        <input type="text" id="new-task-name" placeholder="Task name" onkeypress="if(event.key==='Enter') addTask()" />
+        <select id="new-task-category">
+          <option value="blue">Business – Core</option>
+          <option value="green">Growth</option>
+          <option value="amber">Admin</option>
+          <option value="purple">Personal</option>
+          <option value="coral">Exercise</option>
+          <option value="pink">Waste / Drift</option>
+        </select>
+        <button class="btn-add" onclick="addTask()">+ Add task</button>
+      </div>
+
+      <div class="tiles-grid" id="tiles-container">
+        <div class="tile blue" data-task-id="1">
+          <div class="tile-label">Business – Core</div>
+          <div class="tile-title">Sourcing products</div>
+          <div class="tile-timer">00:00</div>
+          <div class="tile-buttons">
+            <div class="tile-buttons-row">
+              <button class="tile-btn-start" onclick="startTask(1)">Start</button>
+              <button class="tile-btn-stop" onclick="stopTask(1)" style="display:none;">Stop</button>
+            </div>
+            <button class="tile-btn-note" onclick="openNotesModal(1)">+ Notes</button>
+          </div>
+        </div>
+
+        <div class="tile amber" data-task-id="2">
+          <div class="tile-label">Business – Admin</div>
+          <div class="tile-title">Email & messages</div>
+          <div class="tile-timer">00:00</div>
+          <div class="tile-buttons">
+            <div class="tile-buttons-row">
+              <button class="tile-btn-start" onclick="startTask(2)">Start</button>
+              <button class="tile-btn-stop" onclick="stopTask(2)" style="display:none;">Stop</button>
+            </div>
+            <button class="tile-btn-note" onclick="openNotesModal(2)">+ Notes</button>
+          </div>
+        </div>
+
+        <div class="tile green" data-task-id="3">
+          <div class="tile-label">Growth</div>
+          <div class="tile-title">Coding – API</div>
+          <div class="tile-timer">00:00</div>
+          <div class="tile-buttons">
+            <div class="tile-buttons-row">
+              <button class="tile-btn-start" onclick="startTask(3)">Start</button>
+              <button class="tile-btn-stop" onclick="stopTask(3)" style="display:none;">Stop</button>
+            </div>
+            <button class="tile-btn-note" onclick="openNotesModal(3)">+ Notes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALLOCATE TAB -->
+    <div id="allocate" class="tab-content">
+      <div class="allocate-grid" id="allocate-container"></div>
+      <div class="allocate-summary">
+        <div>
+          <div class="allocate-summary-label">Total weekly allocation</div>
+          <div class="allocate-summary-value" id="total-allocation">44h</div>
+        </div>
+        <div>
+          <div class="allocate-summary-label">Daily average</div>
+          <div class="allocate-summary-value" id="daily-average">~6.3h</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="history" class="tab-content">
+      <div class="history-grid" id="history-container"></div>
+    </div>
+  </div>
+
+  <!-- RESUME SESSION MODAL -->
+  <div class="modal-overlay" id="resume-modal">
+    <div class="modal">
+      <div class="modal-title" style="font-size: 20px; text-align: center;">Resume session?</div>
+      <div style="background: #0f0f0f; border: 0.5px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 1.5rem; text-align: center; font-size: 14px;">
+        You stopped <span id="resume-date">Monday</span> at <span id="resume-time">8:00 PM</span>
+      </div>
+      <div class="modal-form-group">
+        <label class="modal-label">Reason (optional)</label>
+        <textarea id="resume-reason" placeholder="e.g. Extended session, had more work..." style="min-height: 80px;"></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="startNewSession()">New session</button>
+        <button class="btn-save" onclick="resumeSession()">Resume</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="end-day-modal">
+    <div class="modal">
+      <div class="modal-title" style="font-size: 24px; text-align: center;">👋 Day Complete</div>
+      <div style="background: #0f0f0f; border: 0.5px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 1.5rem; text-align: center;">
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 12px; color: #999; text-transform: uppercase; margin-bottom: 4px;">Total tracked</div>
+          <div style="font-size: 28px; font-weight: 600; font-family: monospace; color: #60a5fa;" id="end-day-total">00:00</div>
+        </div>
+        <div style="border-top: 0.5px solid #333; padding-top: 12px;">
+          <div style="font-size: 12px; color: #999; text-transform: uppercase; margin-bottom: 4px;">Tasks</div>
+          <div style="font-size: 24px; font-weight: 600; color: #e5e5e5;" id="end-day-tasks">0</div>
+        </div>
+      </div>
+      <div class="modal-form-group">
+        <label class="modal-label">Notes (optional)</label>
+        <textarea id="end-day-notes" placeholder="e.g. Finished early, had personal stuff..." style="min-height: 80px;"></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeEndDayModal()">Keep going</button>
+        <button style="background: #ef4444; color: #fff;" onclick="finishDay()">End day</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUME SESSION MODAL -->
+  <div class="modal-overlay" id="resume-modal">
+    <div class="modal">
+      <div class="modal-title" style="font-size: 20px; text-align: center;">Resume session?</div>
+      <div style="background: #0f0f0f; border: 0.5px solid #333; border-radius: 8px; padding: 12px; margin-bottom: 1.5rem; text-align: center; font-size: 14px;">
+        You stopped <span id="resume-date">Monday</span> at <span id="resume-time">8:00 PM</span>
+      </div>
+      <div class="modal-form-group">
+        <label class="modal-label">Reason (optional)</label>
+        <textarea id="resume-reason" placeholder="e.g. Extended session, had more work..." style="min-height: 80px;"></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="startNewSession()">New session</button>
+        <button class="btn-save" onclick="resumeSession()">Resume</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTES MODAL -->
+  <div class="modal-overlay" id="notes-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeNotesModal()">×</button>
+      <div class="modal-title" id="notes-modal-title">Add notes</div>
+      <div class="modal-form-group">
+        <label class="modal-label">What did you do?</label>
+        <textarea id="notes-input" placeholder="e.g. Completed 3 listings..."></textarea>
+      </div>
+      <div class="modal-form-group">
+        <label class="modal-label">Output / Result</label>
+        <textarea id="output-input" placeholder="e.g. 3 live, 2 in review..."></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeNotesModal()">Cancel</button>
+        <button class="btn-save" onclick="saveNotes()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal" style="max-width: 600px;">
+      <button class="modal-close" onclick="closeSettingsModal()">×</button>
+      <div class="modal-title">Settings & Categories</div>
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 1.5rem;">Categories</div>
+      <div id="categories-list"></div>
+      <div class="modal-form-group">
+        <label class="modal-label">Add new category</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-category-name" placeholder="Category name" style="flex: 1;" />
+          <button class="btn-add" onclick="addCategory()">Add</button>
+        </div>
+      </div>
+      <div class="modal-buttons" style="margin-top: 2rem;">
+        <button class="btn-cancel" onclick="closeSettingsModal()" style="flex: 1;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      dayStarted: false,
+      dayStartTime: null,
+      currentTaskId: null,
+      tasks: {
+        1: { name: 'Sourcing products', category: 'Business – Core', color: 'blue', seconds: 0, notes: '', output: '' },
+        2: { name: 'Email & messages', category: 'Business – Admin', color: 'amber', seconds: 0, notes: '', output: '' },
+        3: { name: 'Coding – API', category: 'Growth', color: 'green', seconds: 0, notes: '', output: '' },
+      },
+      allocations: {
+        'Business – Core': { weekly: 20, daily: 4, color: '#3b82f6' },
+        'Business – Admin': { weekly: 8, daily: 1, color: '#f59e0b' },
+        'Growth': { weekly: 5, daily: 0.5, color: '#10b981' },
+        'Personal': { weekly: 3, daily: 0, color: '#a855f7' },
+        'Exercise': { weekly: 3, daily: 0.3, color: '#f87171' },
+        'Waste / Drift': { weekly: 2, daily: 0, color: '#ec4899' },
+      },
+      history: [],
+      nextTaskId: 4,
+      timerInterval: null,
+      clockInterval: null,
+      lastSession: null,
+    };
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      const hours = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('day-timer').textContent = `${hours}:${mins}`;
+    }
+
+    function startDay() {
+      const today = new Date().toDateString();
+      
+      // Check if there's a session from today that was stopped
+      if (state.lastSession && state.lastSession.date === today) {
+        // Show resume modal
+        document.getElementById('resume-date').textContent = state.lastSession.date;
+        document.getElementById('resume-time').textContent = state.lastSession.endTime;
+        document.getElementById('resume-reason').value = '';
+        document.getElementById('resume-modal').classList.add('active');
+        return;
+      }
+
+      // Start fresh session
+      beginSession();
+    }
+
+    function resumeSession() {
+      state.lastSession.resumeReason = document.getElementById('resume-reason').value;
+      document.getElementById('resume-modal').classList.remove('active');
+      beginSession();
+    }
+
+    function startNewSession() {
+      state.lastSession = null;
+      document.getElementById('resume-modal').classList.remove('active');
+      beginSession();
+    }
+
+    function beginSession() {
+      state.dayStarted = true;
+      state.dayStartTime = new Date();
+      document.getElementById('tracker-lock').classList.remove('active');
+      document.getElementById('stop-day-btn').disabled = false;
+      updateClock();
+      startTimerInterval();
+    }
+
+    function startTask(taskId) {
+      if (!state.dayStarted) return;
+      
+      if (state.currentTaskId !== null && state.currentTaskId !== taskId) {
+        stopTask(state.currentTaskId);
+      }
+
+      state.currentTaskId = taskId;
+      const tile = document.querySelector(`[data-task-id="${taskId}"]`);
+      tile.classList.add('running');
+      tile.querySelector('.tile-btn-start').style.display = 'none';
+      tile.querySelector('.tile-btn-stop').style.display = 'block';
+
+      if (!state.timerInterval) {
+        state.timerInterval = setInterval(() => {
+          if (state.currentTaskId !== null) {
+            state.tasks[state.currentTaskId].seconds++;
+            updateTaskDisplay(state.currentTaskId);
+          }
+        }, 1000);
+      }
+    }
+
+    function stopTask(taskId) {
+      if (state.currentTaskId === taskId) {
+        state.currentTaskId = null;
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+
+      const tile = document.querySelector(`[data-task-id="${taskId}"]`);
+      tile.classList.remove('running');
+      tile.querySelector('.tile-btn-start').style.display = 'block';
+      tile.querySelector('.tile-btn-stop').style.display = 'none';
+    }
+
+    function updateTaskDisplay(taskId) {
+      const tile = document.querySelector(`[data-task-id="${taskId}"]`);
+      if (tile) {
+        tile.querySelector('.tile-timer').textContent = formatTime(state.tasks[taskId].seconds);
+      }
+    }
+
+    function startTimerInterval() {
+      if (!state.clockInterval) {
+        state.clockInterval = setInterval(updateClock, 1000);
+      }
+    }
+
+    function addTask() {
+      if (!state.dayStarted) return;
+
+      const name = document.getElementById('new-task-name').value;
+      const category = document.getElementById('new-task-category').value;
+
+      if (!name.trim()) return;
+
+      const categoryMap = {
+        'blue': 'Business – Core',
+        'amber': 'Business – Admin',
+        'green': 'Growth',
+        'purple': 'Personal',
+        'coral': 'Exercise',
+        'pink': 'Waste / Drift',
+      };
+
+      const taskId = state.nextTaskId++;
+      state.tasks[taskId] = {
+        name,
+        category: categoryMap[category],
+        color: category,
+        seconds: 0,
+        notes: '',
+        output: '',
+      };
+
+      const tile = document.createElement('div');
+      tile.className = `tile ${category}`;
+      tile.dataset.taskId = taskId;
+      tile.innerHTML = `
+        <div class="tile-label">${categoryMap[category]}</div>
+        <div class="tile-title">${name}</div>
+        <div class="tile-timer">00:00</div>
+        <div class="tile-buttons">
+          <div class="tile-buttons-row">
+            <button class="tile-btn-start" onclick="startTask(${taskId})">Start</button>
+            <button class="tile-btn-stop" onclick="stopTask(${taskId})" style="display:none;">Stop</button>
+          </div>
+          <button class="tile-btn-note" onclick="openNotesModal(${taskId})">+ Notes</button>
+        </div>
+      `;
+
+      document.getElementById('tiles-container').appendChild(tile);
+      document.getElementById('new-task-name').value = '';
+    }
+
+    function showEndDayModal() {
+      const total = Object.values(state.tasks).reduce((sum, t) => sum + t.seconds, 0);
+      const count = Object.values(state.tasks).filter(t => t.seconds > 0).length;
+      document.getElementById('end-day-total').textContent = formatTime(total);
+      document.getElementById('end-day-tasks').textContent = count;
+      document.getElementById('end-day-modal').classList.add('active');
+    }
+
+    function closeEndDayModal() {
+      document.getElementById('end-day-modal').classList.remove('active');
+    }
+
+    function finishDay() {
+      const dateStr = state.dayStartTime.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+      });
+      const total = Object.values(state.tasks).reduce((sum, t) => sum + t.seconds, 0);
+      const count = Object.values(state.tasks).filter(t => t.seconds > 0).length;
+      const notes = document.getElementById('end-day-notes').value;
+      const now = new Date();
+      const endTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      state.history.unshift({
+        date: dateStr,
+        total: formatTime(total),
+        tasks: count,
+        waste: '0m',
+        notes: notes,
+      });
+
+      // Track this session as the last one
+      state.lastSession = {
+        date: new Date().toDateString(),
+        endTime: endTime,
+        resumeReason: null,
+      };
+
+      Object.values(state.tasks).forEach(task => {
+        task.seconds = 0;
+      });
+
+      state.dayStarted = false;
+      state.currentTaskId = null;
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+      document.getElementById('end-day-notes').value = '';
+
+      document.getElementById('end-day-modal').classList.remove('active');
+      document.getElementById('tracker-lock').classList.add('active');
+      document.getElementById('stop-day-btn').disabled = true;
+      document.querySelectorAll('.tile-timer').forEach(el => el.textContent = '00:00');
+      document.querySelectorAll('.tile').forEach(el => {
+        el.classList.remove('running');
+        el.querySelector('.tile-btn-start').style.display = 'block';
+        el.querySelector('.tile-btn-stop').style.display = 'none';
+      });
+
+      renderHistoryTab();
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tab).classList.add('active');
+      event.target.classList.add('active');
+
+      if (tab === 'allocate') renderAllocateTab();
+      if (tab === 'history') renderHistoryTab();
+    }
+
+    function openNotesModal(taskId) {
+      document.getElementById('notes-modal-title').textContent = `Notes: ${state.tasks[taskId].name}`;
+      document.getElementById('notes-input').value = state.tasks[taskId].notes;
+      document.getElementById('output-input').value = state.tasks[taskId].output;
+      document.getElementById('notes-modal').dataset.taskId = taskId;
+      document.getElementById('notes-modal').classList.add('active');
+    }
+
+    function closeNotesModal() {
+      document.getElementById('notes-modal').classList.remove('active');
+    }
+
+    function saveNotes() {
+      const taskId = document.getElementById('notes-modal').dataset.taskId;
+      state.tasks[taskId].notes = document.getElementById('notes-input').value;
+      state.tasks[taskId].output = document.getElementById('output-input').value;
+      closeNotesModal();
+    }
+
+    function openSettingsModal() {
+      renderCategoriesList();
+      document.getElementById('settings-modal').classList.add('active');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.remove('active');
+    }
+
+    function renderCategoriesList() {
+      const container = document.getElementById('categories-list');
+      container.innerHTML = '';
+      Object.keys(state.allocations).forEach(category => {
+        const alloc = state.allocations[category];
+        const item = document.createElement('div');
+        item.className = 'category-item';
+        item.innerHTML = `
+          <input type="color" value="${alloc.color}" onchange="state.allocations['${category}'].color = this.value;" style="width: 40px; height: 40px; border: 0; border-radius: 6px; cursor: pointer;" />
+          <div class="category-item-name">${category}</div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-edit" onclick="editCategory('${category}')">Edit</button>
+            <button class="btn-delete" onclick="deleteCategory('${category}')">Delete</button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function editCategory(oldName) {
+      const newName = prompt('Edit category name:', oldName);
+      if (newName && newName !== oldName && !state.allocations[newName]) {
+        state.allocations[newName] = state.allocations[oldName];
+        delete state.allocations[oldName];
+        renderCategoriesList();
+      }
+    }
+
+    function deleteCategory(category) {
+      if (Object.keys(state.allocations).length > 1) {
+        delete state.allocations[category];
+        renderCategoriesList();
+      }
+    }
+
+    function addCategory() {
+      const name = document.getElementById('new-category-name').value.trim();
+      if (!name || state.allocations[name]) return;
+      state.allocations[name] = { weekly: 5, daily: 0.5, color: '#999' };
+      document.getElementById('new-category-name').value = '';
+      renderCategoriesList();
+    }
+
+    function renderAllocateTab() {
+      const container = document.getElementById('allocate-container');
+      container.innerHTML = '';
+
+      Object.entries(state.allocations).forEach(([category, alloc]) => {
+        const daily = (alloc.weekly / 7).toFixed(1);
+        const card = document.createElement('div');
+        card.className = 'allocate-card';
+        card.innerHTML = `
+          <div class="allocate-card-title">
+            <span class="color-dot" style="background-color: ${alloc.color}"></span>
+            ${category}
+          </div>
+          <div class="allocate-row">
+            <div class="allocate-label">Weekly target</div>
+            <input type="number" class="allocate-input" value="${alloc.weekly}" onchange="state.allocations['${category}'].weekly = parseFloat(this.value); updateAllocateSummary();" />
+            <div class="allocate-unit">hours</div>
+          </div>
+          <div class="allocate-row">
+            <div class="allocate-label">Daily minimum</div>
+            <input type="number" step="0.5" class="allocate-input" value="${alloc.daily}" onchange="state.allocations['${category}'].daily = parseFloat(this.value);" />
+            <div class="allocate-unit">hours</div>
+          </div>
+          <div class="allocate-row" style="border-top: 0.5px solid #333; margin-top: 12px; padding-top: 12px;">
+            <div class="allocate-label">Daily target</div>
+            <div style="width: 100px; text-align: right; font-family: monospace; font-weight: 500; color: #60a5fa;">~${daily}h</div>
+            <div class="allocate-unit">auto</div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      updateAllocateSummary();
+    }
+
+    function updateAllocateSummary() {
+      const total = Object.values(state.allocations).reduce((sum, a) => sum + a.weekly, 0);
+      const daily = (total / 7).toFixed(1);
+      document.getElementById('total-allocation').textContent = total + 'h';
+      document.getElementById('daily-average').textContent = '~' + daily + 'h';
+    }
+
+    function renderHistoryTab() {
+      const container = document.getElementById('history-container');
+      container.innerHTML = '';
+      
+      if (state.history.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999;">No history yet</div>';
+        return;
+      }
+
+      state.history.forEach((entry, index) => {
+        const card = document.createElement('div');
+        card.className = 'history-card';
+        let cardHTML = `
+          <div class="history-card-date">
+            ${entry.date}
+            <button class="btn-delete" onclick="state.history.splice(${index}, 1); renderHistoryTab();">Delete</button>
+          </div>
+          <div class="history-card-stat">
+            <span class="history-card-label">Total time</span>
+            <span class="history-card-value">${entry.total}</span>
+          </div>
+          <div class="history-card-stat">
+            <span class="history-card-label">Tasks</span>
+            <span class="history-card-value">${entry.tasks}</span>
+          </div>
+          <div class="history-card-stat">
+            <span class="history-card-label">Waste</span>
+            <span class="history-card-value">${entry.waste}</span>
+          </div>
+        `;
+        
+        if (entry.notes) {
+          cardHTML += `
+            <div style="border-top: 0.5px solid #333; margin-top: 12px; padding-top: 12px;">
+              <div style="font-size: 12px; color: #999; text-transform: uppercase; margin-bottom: 4px;">Notes</div>
+              <div style="font-size: 13px; color: #e5e5e5;">${entry.notes}</div>
+            </div>
+          `;
+        }
+        
+        card.innerHTML = cardHTML;
+        container.appendChild(card);
+      });
+    }
+
+    updateClock();
+  </script>
+</body>
+</html>
