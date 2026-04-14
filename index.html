@@ -30,7 +30,7 @@
     .content { display: none; }
     .content.active { display: block; }
     
-    .lock { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 500; }
+    .lock { position: fixed; top: 320px; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 500; }
     .lock.active { display: flex; }
     .lock-box { text-align: center; }
     .lock-title { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #ec4899, #f97316, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 2rem; }
@@ -115,6 +115,7 @@
     <div class="tabs">
       <button class="tab active" onclick="showTab('tracker')">Tracker</button>
       <button class="tab" onclick="showTab('allocate')">Allocate</button>
+      <button class="tab" onclick="showTab('settings')">Settings</button>
       <button class="tab" onclick="showTab('history')">History</button>
     </div>
 
@@ -274,12 +275,6 @@
       const now = new Date();
       document.getElementById('date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
       document.getElementById('time').textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-      updateDayTotal();
-    }
-
-    function updateDayTotal() {
-      const total = Object.values(app.tasks).reduce((s,t) => s+t.sec, 0);
-      document.getElementById('day-total').textContent = fmt(total);
     }
 
     function startDay() {
@@ -326,6 +321,16 @@
         });
       }
       
+      // Update task category dropdown
+      const select = document.getElementById('task-cat');
+      select.innerHTML = '';
+      Object.keys(app.categories).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+      
       if(document.getElementById('tiles').innerHTML === '') {
         renderTiles();
       }
@@ -360,8 +365,42 @@
           const tilesBox = document.getElementById('tiles');
           const tile = document.createElement('div');
           tile.className = `tile ${app.tasks[t.id].color}`;
-          tile.style.left = '0px';
-          tile.style.top = '0px';
+          
+          // Find next free grid position
+          let posX = 0, posY = 0;
+          let found = false;
+          const GRID = 50;
+          const TILE_W = 280;
+          const TILE_H = 200;
+          const MAX_X = 1000;
+          
+          while(!found) {
+            let collision = false;
+            // Check if this position collides with any existing tile
+            Object.values(app.tasks).forEach(existing => {
+              if(existing.id !== t.id) {
+                const xOverlap = posX < existing.x + TILE_W && posX + TILE_W > existing.x;
+                const yOverlap = posY < existing.y + TILE_H && posY + TILE_H > existing.y;
+                if(xOverlap && yOverlap) collision = true;
+              }
+            });
+            
+            if(!collision) {
+              found = true;
+            } else {
+              posX += GRID * 6; // Move 300px right
+              if(posX > MAX_X) {
+                posX = 0;
+                posY += GRID * 4; // Move 200px down
+              }
+            }
+          }
+          
+          app.tasks[t.id].x = posX;
+          app.tasks[t.id].y = posY;
+          
+          tile.style.left = posX + 'px';
+          tile.style.top = posY + 'px';
           tile.dataset.id = t.id;
           tile.innerHTML = `
             <div class="tile-head">
@@ -376,6 +415,10 @@
                 <button class="tile-btn btn-stop" onclick="stopTask(${t.id})" style="display:none;">Stop</button>
               </div>
               <button class="tile-btn btn-note" onclick="openNotes(${t.id})">+ Notes</button>
+              <div class="tile-row" style="margin-top: 8px;">
+                <button class="tile-btn" style="background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.3); flex: 1;" onclick="openEditTask(${t.id})">Edit</button>
+                <button class="tile-btn" style="background: #7f1d1d; color: #fca5a5; flex: 1;" onclick="deleteTask(${t.id})">Delete</button>
+              </div>
             </div>
           `;
           tilesBox.appendChild(tile);
@@ -476,7 +519,6 @@
             app.tasks[app.currentTask].sec++;
             const el = document.querySelector(`[data-id="${app.currentTask}"] .tile-time`);
             if(el) el.textContent = fmt(app.tasks[app.currentTask].sec);
-            updateDayTotal();
           }
         }, 1000);
       }
@@ -722,15 +764,38 @@
     }
 
     function addCategory() {
-      const name = document.getElementById('new-cat-name').value.trim();
-      if(!name) return;
-      SB.from('categories').insert({name, color:'#999'}).then(() => {
+      const input = document.getElementById('new-cat-name');
+      const name = input.value.trim();
+      if(!name) {
+        alert('Category name required');
+        return;
+      }
+      SB.from('categories').insert({name, color:'#999'}).then(res => {
+        if(res.error) {
+          console.error(res.error);
+          alert('Error: ' + res.error.message);
+          return;
+        }
         app.categories[name] = '#999';
         // Also create category_targets entry
-        SB.from('category_targets').insert({category:name, weekly_hours:0, daily_minimum:0}).catch(e => console.error(e));
-        renderSettings();
-        document.getElementById('new-cat-name').value = '';
-      }).catch(e => console.error(e));
+        SB.from('category_targets').insert({category:name, weekly_hours:0, daily_minimum:0}).then(() => {
+          // Update the task category dropdown
+          const select = document.getElementById('task-cat');
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          select.appendChild(option);
+          
+          renderSettings();
+          input.value = '';
+        }).catch(e => {
+          console.error(e);
+          alert('Error creating target: ' + e.message);
+        });
+      }).catch(e => {
+        console.error(e);
+        alert('Error adding category: ' + e.message);
+      });
     }
 
     function updateCatColor(name, color) {
