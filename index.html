@@ -377,10 +377,21 @@
           // Add tile to DOM
           const tilesBox = document.getElementById('tiles');
           const tile = document.createElement('div');
-          tile.className = `tile ${app.tasks[t.id].color}`;
+          tile.className = `tile`;
           tile.style.left = posX + 'px';
           tile.style.top = posY + 'px';
           tile.dataset.id = t.id;
+          
+          // Get category color
+          const catColor = app.categories[t.category] || '#999';
+          const hexToRgb = (hex) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : hex;
+          };
+          
+          tile.style.backgroundColor = hexToRgb(catColor);
+          tile.style.borderColor = catColor;
+          
           tile.innerHTML = `
             <div class="tile-head">
               <div class="tile-label">${t.category}</div>
@@ -432,10 +443,21 @@
         t.y = posY;
         
         const tile = document.createElement('div');
-        tile.className = `tile ${t.color}`;
+        tile.className = `tile`;
         tile.style.left = posX + 'px';
         tile.style.top = posY + 'px';
         tile.dataset.id = id;
+        
+        // Get category color from app.categories (hex) or use task color
+        const catColor = app.categories[t.cat] || '#999';
+        const hexToRgb = (hex) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : hex;
+        };
+        
+        tile.style.backgroundColor = hexToRgb(catColor);
+        tile.style.borderColor = catColor;
+        
         tile.innerHTML = `
           <div class="tile-head">
             <div class="tile-label">${t.cat}</div>
