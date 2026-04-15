@@ -32,7 +32,7 @@
     
     .lock { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
     .lock.active { display: flex; }
-    .lock-box { text-align: center; margin-top: -800px; }
+    .lock-box { text-align: center; margin-top: -400px; }
     .lock-title { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #ec4899, #f97316, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 2rem; }
     .lock-btn { padding: 20px 60px; font-size: 18px; background: #10b981; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
     
@@ -361,9 +361,13 @@
           
           // Assign grid position based on task count
           const taskIndex = Object.keys(app.tasks).length - 1;
-          const COLS = 3;
-          const TILE_W = 300;
-          const TILE_H = 350;
+          const TILE_W = 295;
+          const TILE_H = 340;
+          
+          // Calculate how many tiles fit per row based on container width
+          const containerWidth = 1100;
+          const COLS = Math.floor(containerWidth / TILE_W);
+          
           const col = taskIndex % COLS;
           const row = Math.floor(taskIndex / COLS);
           const posX = col * TILE_W;
@@ -425,9 +429,10 @@
       box.innerHTML = '';
       if(lock) box.appendChild(lock);
       
-      const COLS = 3;
-      const TILE_W = 300;
-      const TILE_H = 350;
+      const TILE_W = 295;
+      const TILE_H = 340;
+      const containerWidth = 1100;
+      const COLS = Math.floor(containerWidth / TILE_W);
       
       const taskArray = Object.entries(app.tasks).sort((a, b) => a[0] - b[0]);
       taskArray.forEach((entry, idx) => {
@@ -506,48 +511,16 @@
         document.removeEventListener('mouseup', end);
         
         if(moved) {
-          const COLS = 3;
-          const TILE_W = 300;
-          const TILE_H = 350;
+          const TILE_W = 295;
+          const TILE_H = 340;
           
           // Convert to grid coordinates
           let col = Math.round(app.tasks[id].x / TILE_W);
           let row = Math.round(app.tasks[id].y / TILE_H);
           
-          // Clamp to valid range
-          col = Math.max(0, Math.min(col, COLS - 1));
+          // Allow any column and row (no limit)
+          col = Math.max(0, col);
           row = Math.max(0, row);
-          
-          // Find next available slot (check for occupied)
-          let found = false;
-          let testRow = row;
-          let testCol = col;
-          
-          while(!found) {
-            const testX = testCol * TILE_W;
-            const testY = testRow * TILE_H;
-            
-            // Check if this slot is occupied by another task
-            let occupied = false;
-            Object.entries(app.tasks).forEach(([otherId, other]) => {
-              if(otherId != id && other.x === testX && other.y === testY) {
-                occupied = true;
-              }
-            });
-            
-            if(!occupied) {
-              found = true;
-              col = testCol;
-              row = testRow;
-            } else {
-              // Try next column in row
-              testCol++;
-              if(testCol >= COLS) {
-                testCol = 0;
-                testRow++;
-              }
-            }
-          }
           
           const snappedX = col * TILE_W;
           const snappedY = row * TILE_H;
