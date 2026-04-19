@@ -7,122 +7,76 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 1rem; }
-    ::-webkit-scrollbar { display: none; }
-    * { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    .container { max-width: 1600px; margin: 0 auto; }
+    body { background: #0f0f0f; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
     .header h1 { font-size: 28px; }
-    .time-display div:first-child { font-size: 12px; color: #999; }
-    .time-display div:last-child { font-size: 22px; font-weight: 600; font-family: monospace; }
-    
-    .controls { display: flex; gap: 1rem; margin-bottom: 2rem; }
-    button { padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; border: none; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-stop { background: #ef4444; color: #fff; }
-    .btn-settings { background: #1a1a1a; color: #e5e5e5; border: 0.5px solid #333; }
-    
-    .tabs { display: flex; border-bottom: 0.5px solid #333; margin-bottom: 2rem; }
-    .tab { padding: 12px 24px; background: transparent; border: none; color: #999; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 500; }
-    .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
-    
+    .time-display { text-align: right; }
+    .time-display .date { font-size: 12px; color: #999; }
+    .time-display .time { font-size: 32px; font-weight: bold; }
+    .controls { display: flex; gap: 12px; margin-bottom: 2rem; }
+    .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .btn-primary { background: #ef4444; color: white; }
+    .btn-secondary { background: #333; color: #e5e5e5; }
+    .tabs { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 1px solid #333; }
+    .tab { padding: 12px 24px; cursor: pointer; border-bottom: 2px solid transparent; color: #999; }
+    .tab.active { color: #e5e5e5; border-bottom-color: #3b82f6; }
     .content { display: none; position: relative; }
     .content.active { display: block; }
-    
-    .lock { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-    .lock.active { display: flex; }
-    .lock-box { text-align: center; margin-top: -400px; }
+    .lock { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .lock.hidden { display: none; }
+    .lock-box { text-align: center; }
     .lock-title { font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #ec4899, #f97316, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 2rem; }
-    .lock-btn { padding: 20px 60px; font-size: 18px; background: #10b981; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
-    
-    .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
-    @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
-    
-    .add-task { display: flex; gap: 12px; margin-bottom: 2rem; }
-    input, select { background: #1a1a1a; color: #e5e5e5; border: 0.5px solid #333; padding: 12px; border-radius: 8px; font-size: 14px; }
-    .add-task input { flex: 1; }
-    .btn-add { background: #3b82f6; color: #fff; padding: 12px 24px; cursor: pointer; border: none; }
-    
-    .tiles { position: relative; width: 100%; height: 1600px; background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; overflow: auto; }
-    .tile { position: absolute; width: 280px; padding: 20px; border-radius: 12px; border: 1px solid; display: flex; flex-direction: column; min-height: 200px; cursor: grab; user-select: none; }
-    .tile:active { cursor: grabbing; }
-    .tile.dragging { box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 1000; }
-    
-    .tile.blue { background: linear-gradient(135deg, #1e3a8a, #1e40af); border-color: #3b82f6; }
-    .tile.amber { background: linear-gradient(135deg, #78350f, #92400e); border-color: #f59e0b; }
-    .tile.green { background: linear-gradient(135deg, #1b4332, #1f6e3a); border-color: #10b981; }
-    .tile.purple { background: linear-gradient(135deg, #3f0f5c, #581c87); border-color: #a855f7; }
-    .tile.coral { background: linear-gradient(135deg, #5a2a2a, #7c2d12); border-color: #f87171; }
-    .tile.pink { background: linear-gradient(135deg, #5a2f5a, #831843); border-color: #ec4899; }
-    
-    .tile-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-    .tile-label { font-size: 11px; font-weight: 600; text-transform: uppercase; opacity: 0.8; }
-    .tile-handle { background: rgba(255,255,255,0.2); color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: grab; font-size: 14px; }
-    .tile-name { font-size: 16px; font-weight: 600; margin-bottom: 12px; flex: 1; }
-    .tile-time { font-size: 42px; font-weight: 700; font-family: monospace; margin: 12px 0; }
-    .tile-btns { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
-    .tile-row { display: flex; gap: 8px; }
-    .tile-btn { flex: 1; border: none; padding: 10px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: #fff; }
-    .btn-start { background: #10b981; }
-    .btn-stop { background: #ef4444; }
-    .btn-note { width: 100%; background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.3); }
-    
-    .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-    .sidebar-card { background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; padding: 16px; }
-    .sidebar-title { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #999; margin-bottom: 12px; }
-    .alloc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .alloc-label { font-size: 12px; color: #999; flex: 1; }
-    .alloc-input { width: 80px; text-align: right; font-family: monospace; padding: 8px !important; }
-    .alloc-unit { font-size: 12px; color: #999; min-width: 20px; }
-    
-    .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-    .card { background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; padding: 20px; }
-    .card-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    .card-stat { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; }
-    .stat-label { color: #999; }
-    .stat-value { color: #60a5fa; font-weight: 600; font-family: monospace; }
-    
-    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; }
-    .modal.active { display: flex; }
-    .modal-box { background: #1a1a1a; border: 0.5px solid #333; border-radius: 12px; padding: 2rem; width: 100%; max-width: 500px; position: relative; }
-    .modal-title { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
-    .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: #999; font-size: 24px; cursor: pointer; }
-    .form-group { margin-bottom: 1.5rem; }
-    .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; color: #999; }
-    textarea { width: 100%; background: #0f0f0f; color: #e5e5e5; border: 0.5px solid #333; padding: 12px; border-radius: 8px; min-height: 100px; }
-    .modal-btns { display: flex; gap: 12px; margin-top: 1.5rem; }
-    .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; }
-    .btn-cancel { background: #1a1a1a; color: #e5e5e5; border: 0.5px solid #333; }
-    .btn-ok { background: #3b82f6; color: #fff; }
+    .lock-btn { padding: 16px 48px; font-size: 18px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .add-task { display: flex; gap: 12px; margin-bottom: 2rem; flex-wrap: wrap; }
+    .add-task input, .add-task select { flex: 1; min-width: 150px; padding: 12px; background: #1a1a1a; color: #e5e5e5; border: 0.5px solid #333; border-radius: 8px; font-size: 14px; }
+    .add-task button { padding: 12px 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 2rem; }
+    .tile { padding: 20px; border-radius: 12px; position: relative; }
+    .tile-head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .tile-label { font-size: 11px; text-transform: uppercase; opacity: 0.8; }
+    .tile-handle { background: rgba(255,255,255,0.1); border: none; color: #e5e5e5; cursor: move; padding: 6px; border-radius: 6px; }
+    .tile-name { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+    .tile-time { font-size: 36px; font-family: monospace; margin-bottom: 16px; }
+    .tile-btns { display: grid; gap: 8px; }
+    .tile-btn { padding: 10px; background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.2); color: #e5e5e5; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .tile-btn:hover { background: rgba(255,255,255,0.2); }
+    .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: #1a1a1a; padding: 16px; border-radius: 8px; border: 0.5px solid #333; }
+    .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>⏱ Time Tracker</h1>
+      <h1>⏱️ Time Tracker</h1>
       <div class="time-display">
-        <div id="date">Loading...</div>
-        <div id="time">00:00</div>
+        <div class="date" id="date"></div>
+        <div class="time" id="time"></div>
       </div>
     </div>
 
     <div class="controls">
-      <button class="btn-stop" id="stop-btn" onclick="stopDay()" disabled>Stop day</button>
-      <button class="btn-settings" onclick="showTab('settings')">⚙️ Settings</button>
+      <button class="btn btn-primary" id="stop-btn" onclick="stopDay()" disabled>Stop day</button>
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="showTab('tracker')">Tracker</button>
-      <button class="tab" onclick="showTab('allocate')">Allocate</button>
-      <button class="tab" onclick="showTab('settings')">Settings</button>
-      <button class="tab" onclick="showTab('history')">History</button>
+      <div class="tab active" onclick="showTab('tracker')">Tracker</div>
+      <div class="tab" onclick="showTab('allocate')">Allocate</div>
+      <div class="tab" onclick="showTab('settings')">Settings</div>
+      <div class="tab" onclick="showTab('history')">History</div>
     </div>
 
-    <!-- TRACKER TAB -->
+    <!-- TRACKER with LOCK -->
     <div id="tracker" class="content active">
+      <div class="lock" id="lock">
+        <div class="lock-box">
+          <div class="lock-title">Ready to start your day?</div>
+          <button class="lock-btn" onclick="startDay()">Let's go</button>
+        </div>
+      </div>
       <div class="add-task">
-        <input type="text" id="task-name" placeholder="Task name" />
+        <input type="text" id="task-name" placeholder="Task name">
         <select id="task-cat">
           <option value="Business – Core">Business – Core</option>
           <option value="Business – Admin">Business – Admin</option>
@@ -131,145 +85,31 @@
           <option value="Exercise">Exercise</option>
           <option value="Waste / Drift">Waste / Drift</option>
         </select>
-        <button class="btn-add" onclick="addTask()">+ Add</button>
+        <button class="btn btn-primary" onclick="addTask()">+ Add</button>
       </div>
-
-      <div class="tiles" id="tiles">
-        <div class="lock" id="lock">
-          <div class="lock-box">
-            <div class="lock-title">Ready to start your day?</div>
-            <button class="lock-btn" onclick="startDay()">Let's go</button>
-          </div>
-        </div>
-      </div>
+      <div class="tiles" id="tiles"></div>
     </div>
 
-    <!-- ALLOCATE TAB -->
+    <!-- ALLOCATE -->
     <div id="allocate" class="content">
-      <div class="history-grid" id="allocate-grid"></div>
+      <div id="allocate-grid"></div>
     </div>
 
-    <!-- SETTINGS TAB -->
+    <!-- SETTINGS -->
     <div id="settings" class="content">
-      <div id="settings-container"></div>
+      <div id="settings-content"></div>
     </div>
 
-    <!-- HISTORY TAB -->
+    <!-- HISTORY -->
     <div id="history" class="content">
-      <div class="history-grid" id="history-grid"></div>
-    </div>
-  </div>
-
-  <!-- END DAY MODAL -->
-  <div class="modal" id="end-modal">
-    <div class="modal-box">
-      <div class="modal-title">👋 Day Complete</div>
-      <div style="background: #0f0f0f; border: 0.5px solid #333; padding: 16px; margin-bottom: 1.5rem; border-radius: 8px; text-align: center;">
-        <div style="margin-bottom: 12px;">
-          <div style="font-size: 12px; color: #999; text-transform: uppercase; margin-bottom: 4px;">Total</div>
-          <div style="font-size: 28px; font-weight: 600; font-family: monospace; color: #60a5fa;" id="end-total">00:00</div>
-        </div>
-        <div style="border-top: 0.5px solid #333; padding-top: 12px;">
-          <div style="font-size: 12px; color: #999; text-transform: uppercase; margin-bottom: 4px;">Tasks</div>
-          <div style="font-size: 24px; font-weight: 600;" id="end-tasks">0</div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <textarea id="end-notes"></textarea>
-      </div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeEndDay()">Keep going</button>
-        <button class="btn-ok" onclick="finishDay()">End day</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- EDIT TASK MODAL -->
-  <div class="modal" id="edit-modal">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeEditTask()">×</button>
-      <div class="modal-title" id="edit-title">Edit Task</div>
-      <div class="form-group">
-        <label class="form-label">Task name</label>
-        <input type="text" id="edit-task-name" style="width: 100%; padding: 12px; background: #0f0f0f; color: #e5e5e5; border: 0.5px solid #333; border-radius: 8px; font-size: 14px;" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Category</label>
-        <select id="edit-task-cat" style="width: 100%; padding: 12px; background: #0f0f0f; color: #e5e5e5; border: 0.5px solid #333; border-radius: 8px; font-size: 14px;">
-          <option value="Business – Core">Business – Core</option>
-          <option value="Business – Admin">Business – Admin</option>
-          <option value="Growth">Growth</option>
-          <option value="Personal">Personal</option>
-          <option value="Exercise">Exercise</option>
-          <option value="Waste / Drift">Waste / Drift</option>
-        </select>
-      </div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeEditTask()">Cancel</button>
-        <button class="btn-ok" onclick="saveEditTask()">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- NOTES MODAL -->
-  <div class="modal" id="notes-modal">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeNotes()">×</button>
-      <div class="modal-title" id="notes-title">Notes</div>
-      <div class="form-group">
-        <label class="form-label">What did you do?</label>
-        <textarea id="notes-what"></textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Output</label>
-        <textarea id="notes-out"></textarea>
-      </div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeNotes()">Cancel</button>
-        <button class="btn-ok" onclick="saveNotes()">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SETTINGS MODAL -->
-  <div class="modal" id="settings-modal">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeSettings()">×</button>
-      <div class="modal-title">Settings</div>
-      <div id="settings-cats" style="margin-bottom: 1.5rem;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeSettings()" style="flex: 1;">Close</button>
-      </div>
+      <div id="history-grid"></div>
     </div>
   </div>
 
   <script>
-    const SB = window.supabase.createClient(
-      'https://ffbdazepqrsyurhouxif.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmYmRhemVwcXJzeXVyaG91eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTM5MjIsImV4cCI6MjA5MDQ2OTkyMn0.BAuodLUDGzO9A7IfoRRn0HZ1MgWOXNPeYKPDBNaNWeg'
-    );
-
-    let app = {
-      dayStarted: false,
-      currentTask: null,
-      timerInt: null,
-      tasks: {},
-      nextId: 1,
-      categories: {},
-      catTargets: {},
-    };
-
-    const colorMap = {
-      'Business – Core': 'blue',
-      'Business – Admin': 'amber',
-      'Growth': 'green',
-      'Personal': 'purple',
-      'Exercise': 'coral',
-      'Waste / Drift': 'pink',
-    };
-
-    function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+    const SB = supabase.createClient('https://ffbdazepqrsyurhouxif.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmYmRhemVwcXJzeXVyaG91eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4OTM5MjIsImV4cCI6MjA5MDQ2OTkyMn0.BAuodLUDGzO9A7IfoRRn0HZ1MgWOXNPeYKPDBNaNWeg');
+    
+    let app = { dayStarted: false, tasks: {}, categories: {}, catTargets: {}, currentTask: null, timerInt: null };
 
     function updateTime() {
       const now = new Date();
@@ -277,492 +117,114 @@
       document.getElementById('time').textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
     }
 
-    function startDay() {
-      app.dayStarted = true;
-      document.getElementById('lock').style.display = 'none';
-      document.getElementById('stop-btn').disabled = false;
-      loadTasks();
-      updateTime();
-      setInterval(updateTime, 1000);
-    }
-
-    async function loadTasks() {
-      const {data, error} = await SB.from('tasks').select('*');
-      const {data:cats} = await SB.from('categories').select('*');
-      const {data:catTargs} = await SB.from('category_targets').select('*');
-      
-      if(error) { console.error(error); return; }
-      
-      app.categories = {};
-      if(cats) cats.forEach(c => app.categories[c.name] = c.color);
-
-      app.catTargets = {};
-      if(catTargs) catTargs.forEach(t => {
-        app.catTargets[t.category] = {weekly: t.weekly_hours, daily: t.daily_minimum, id: t.id};
-      });
-
-      app.tasks = {};
-      if(data && data.length > 0) {
-        data.forEach(t => {
-          app.tasks[t.id] = {
-            id:t.id, 
-            name:t.name, 
-            cat:t.category, 
-            color:colorMap[t.category] || 'blue',
-            sec:0, 
-            x:t.pos_x||0, 
-            y:t.pos_y||0, 
-            notes:t.notes||'', 
-            output:t.output||'',
-            weekly:t.weekly_hours||0,
-            daily:t.daily_minimum||0
-          };
-          app.nextId = Math.max(app.nextId, t.id+1);
-        });
-      }
-      
-      // Update task category dropdown
-      const select = document.getElementById('task-cat');
-      select.innerHTML = '';
-      Object.keys(app.categories).forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
-      });
-      
-      renderTiles();
-    }
-
-    function addTask() {
-      if(!app.dayStarted) return;
-      const name = document.getElementById('task-name').value.trim();
-      const cat = document.getElementById('task-cat').value;
-      if(!name) return;
-
-      SB.from('tasks').insert({name, category:cat, color:colorMap[cat]||'blue', pos_x:0, pos_y:0}).select().then(({data, error}) => {
-        if(error) { console.error(error); return; }
-        if(data && data[0]) {
-          const t = data[0];
-          app.tasks[t.id] = {
-            id:t.id, 
-            name:t.name, 
-            cat:t.category, 
-            color:colorMap[t.category]||'blue',
-            sec:0, 
-            x:0, 
-            y:0, 
-            notes:'', 
-            output:'',
-            weekly:0,
-            daily:0
-          };
-          app.nextId = Math.max(app.nextId, t.id+1);
-          
-          // Assign grid position based on task count
-          const taskIndex = Object.keys(app.tasks).length - 1;
-          const TILE_W = 295;
-          const TILE_H = 340;
-          
-          // Calculate how many tiles fit per row based on container width
-          const containerWidth = 1100;
-          const COLS = Math.floor(containerWidth / TILE_W);
-          
-          const col = taskIndex % COLS;
-          const row = Math.floor(taskIndex / COLS);
-          const posX = col * TILE_W;
-          const posY = row * TILE_H;
-          
-          app.tasks[t.id].x = posX;
-          app.tasks[t.id].y = posY;
-          
-          document.getElementById('task-name').value = '';
-          
-          // Add tile to DOM
-          const tilesBox = document.getElementById('tiles');
-          const tile = document.createElement('div');
-          tile.className = `tile`;
-          tile.style.left = posX + 'px';
-          tile.style.top = posY + 'px';
-          tile.dataset.id = t.id;
-          
-          // Get category color
-          const catColor = app.categories[t.category] || '#999';
-          const hexToRgb = (hex) => {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : hex;
-          };
-          
-          tile.style.backgroundColor = hexToRgb(catColor);
-          tile.style.borderColor = catColor;
-          
-          tile.innerHTML = `
-            <div class="tile-head">
-              <div class="tile-label">${t.category}</div>
-              <button class="tile-handle" onmousedown="dragStart(event,${t.id})">⋮⋮</button>
-            </div>
-            <div class="tile-name">${t.name}</div>
-            <div class="tile-time">00:00</div>
-            <div class="tile-btns">
-              <div class="tile-row">
-                <button class="tile-btn btn-start" onclick="startTask(${t.id})">Start</button>
-                <button class="tile-btn btn-stop" onclick="stopTask(${t.id})" style="display:none;">Stop</button>
-              </div>
-              <button class="tile-btn btn-note" onclick="openNotes(${t.id})">+ Notes</button>
-              <div class="tile-row" style="margin-top: 8px;">
-                <button class="tile-btn" style="background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.3); flex: 1;" onclick="openEditTask(${t.id})">Edit</button>
-                <button class="tile-btn" style="background: #7f1d1d; color: #fca5a5; flex: 1;" onclick="deleteTask(${t.id})">Delete</button>
-              </div>
-            </div>
-          `;
-          tilesBox.appendChild(tile);
-          
-          // Save position to Supabase
-          SB.from('tasks').update({pos_x:posX, pos_y:posY}).eq('id', t.id).catch(e => console.error(e));
-        }
-      });
-    }
-
-    function renderTiles() {
-      const box = document.getElementById('tiles');
-      const lock = box.querySelector('.lock');
-      box.innerHTML = '';
-      if(lock) box.appendChild(lock);
-      
-      const TILE_W = 295;
-      const TILE_H = 340;
-      const containerWidth = 1100;
-      const COLS = Math.floor(containerWidth / TILE_W);
-      
-      const taskArray = Object.entries(app.tasks).sort((a, b) => a[0] - b[0]);
-      taskArray.forEach((entry, idx) => {
-        const [id, t] = entry;
-        
-        // Calculate grid position based on index
-        const col = idx % COLS;
-        const row = Math.floor(idx / COLS);
-        const posX = col * TILE_W;
-        const posY = row * TILE_H;
-        
-        t.x = posX;
-        t.y = posY;
-        
-        const tile = document.createElement('div');
-        tile.className = `tile`;
-        tile.style.left = posX + 'px';
-        tile.style.top = posY + 'px';
-        tile.dataset.id = id;
-        
-        // Get category color from app.categories (hex) or use task color
-        const catColor = app.categories[t.cat] || '#999';
-        const hexToRgb = (hex) => {
-          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-          return result ? `rgb(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)})` : hex;
-        };
-        
-        tile.style.backgroundColor = hexToRgb(catColor);
-        tile.style.borderColor = catColor;
-        
-        tile.innerHTML = `
-          <div class="tile-head">
-            <div class="tile-label">${t.cat}</div>
-            <button class="tile-handle" onmousedown="dragStart(event,${id})">⋮⋮</button>
-          </div>
-          <div class="tile-name">${t.name}</div>
-          <div class="tile-time">${fmt(t.sec)}</div>
-          <div class="tile-btns">
-            <div class="tile-row">
-              <button class="tile-btn btn-start" onclick="startTask(${id})">Start</button>
-              <button class="tile-btn btn-stop" onclick="stopTask(${id})" style="display:none;">Stop</button>
-            </div>
-            <button class="tile-btn btn-note" onclick="openNotes(${id})">+ Notes</button>
-            <div class="tile-row" style="margin-top: 8px;">
-              <button class="tile-btn" style="background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.3); flex: 1;" onclick="openEditTask(${id})">Edit</button>
-              <button class="tile-btn" style="background: #7f1d1d; color: #fca5a5; flex: 1;" onclick="deleteTask(${id})">Delete</button>
-            </div>
-          </div>
-        `;
-        box.appendChild(tile);
-      });
-    }
-
-    function dragStart(e, id) {
-      if(!app.dayStarted) return;
-      const tile = document.querySelector(`[data-id="${id}"]`);
-      tile.classList.add('dragging');
-      let sx = e.clientX, sy = e.clientY;
-      let moved = false;
-
-      const move = me => {
-        moved = true;
-        const nx = app.tasks[id].x + (me.clientX - sx);
-        const ny = app.tasks[id].y + (me.clientY - sy);
-        sx = me.clientX;
-        sy = me.clientY;
-        tile.style.left = nx + 'px';
-        tile.style.top = ny + 'px';
-        app.tasks[id].x = nx;
-        app.tasks[id].y = ny;
-      };
-
-      const end = () => {
-        tile.classList.remove('dragging');
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', end);
-        
-        if(moved) {
-          const TILE_W = 295;
-          const TILE_H = 340;
-          
-          // Convert to grid coordinates
-          let col = Math.round(app.tasks[id].x / TILE_W);
-          let row = Math.round(app.tasks[id].y / TILE_H);
-          
-          // Allow any column and row (no limit)
-          col = Math.max(0, col);
-          row = Math.max(0, row);
-          
-          const snappedX = col * TILE_W;
-          const snappedY = row * TILE_H;
-          
-          app.tasks[id].x = snappedX;
-          app.tasks[id].y = snappedY;
-          tile.style.left = snappedX + 'px';
-          tile.style.top = snappedY + 'px';
-          SB.from('tasks').update({pos_x:snappedX, pos_y:snappedY}).eq('id',id).catch(e => console.error(e));
-        }
-      };
-
-      document.addEventListener('mousemove', move);
-      document.addEventListener('mouseup', end);
-    }
-
-    function startTask(id) {
-      if(!app.dayStarted) return;
-      if(app.currentTask && app.currentTask !== id) stopTask(app.currentTask);
-      app.currentTask = id;
-      const tile = document.querySelector(`[data-id="${id}"]`);
-      tile.querySelector('.btn-start').style.display = 'none';
-      tile.querySelector('.btn-stop').style.display = 'block';
-
-      if(!app.timerInt) {
-        app.timerInt = setInterval(() => {
-          if(app.currentTask && app.tasks[app.currentTask]) {
-            app.tasks[app.currentTask].sec++;
-            const el = document.querySelector(`[data-id="${app.currentTask}"] .tile-time`);
-            if(el) el.textContent = fmt(app.tasks[app.currentTask].sec);
-          }
-        }, 1000);
-      }
-    }
-
-    function stopTask(id) {
-      if(app.currentTask === id) {
-        app.currentTask = null;
-        clearInterval(app.timerInt);
-        app.timerInt = null;
-      }
-      const tile = document.querySelector(`[data-id="${id}"]`);
-      if(tile) {
-        tile.querySelector('.btn-start').style.display = 'block';
-        tile.querySelector('.btn-stop').style.display = 'none';
-      }
-    }
-
-    function stopDay() {
-      const total = Object.values(app.tasks).reduce((s,t) => s+t.sec, 0);
-      const count = Object.values(app.tasks).filter(t => t.sec > 0).length;
-      document.getElementById('end-total').textContent = fmt(total);
-      document.getElementById('end-tasks').textContent = count;
-      document.getElementById('end-modal').classList.add('active');
-    }
-
-    function closeEndDay() {
-      document.getElementById('end-modal').classList.remove('active');
-    }
-
-    function finishDay() {
-      const date = new Date().toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
-      const total = Object.values(app.tasks).reduce((s,t) => s+t.sec, 0);
-      const count = Object.values(app.tasks).filter(t => t.sec > 0).length;
-      const notes = document.getElementById('end-notes').value;
-
-      SB.from('history').insert({date, total_time:fmt(total), tasks_count:count, notes});
-
-      Object.values(app.tasks).forEach(t => t.sec = 0);
-      app.dayStarted = false;
-      app.currentTask = null;
-      clearInterval(app.timerInt);
-      app.timerInt = null;
-      document.getElementById('end-notes').value = '';
-      document.getElementById('end-modal').classList.remove('active');
-      document.getElementById('lock').classList.add('active');
-      document.getElementById('stop-btn').disabled = true;
-      renderTiles();
-    }
-
-    function openEditTask(id) {
-      document.getElementById('edit-title').textContent = `Edit: ${app.tasks[id].name}`;
-      document.getElementById('edit-task-name').value = app.tasks[id].name;
-      document.getElementById('edit-task-cat').value = app.tasks[id].cat;
-      document.getElementById('edit-modal').dataset.id = id;
-      document.getElementById('edit-modal').classList.add('active');
-    }
-
-    function closeEditTask() {
-      document.getElementById('edit-modal').classList.remove('active');
-    }
-
-    function saveEditTask() {
-      const id = document.getElementById('edit-modal').dataset.id;
-      const name = document.getElementById('edit-task-name').value.trim();
-      const cat = document.getElementById('edit-task-cat').value;
-      
-      if(!name) return;
-      
-      app.tasks[id].name = name;
-      app.tasks[id].cat = cat;
-      app.tasks[id].color = colorMap[cat] || 'blue';
-      
-      SB.from('tasks').update({name, category:cat, color:app.tasks[id].color}).eq('id', id).then(() => {
-        renderTiles();
-        closeEditTask();
-      }).catch(e => console.error(e));
-    }
-
-    function deleteTask(id) {
-      if(!confirm(`Delete "${app.tasks[id].name}"?`)) return;
-      
-      SB.from('tasks').delete().eq('id', id).then(() => {
-        delete app.tasks[id];
-        renderTiles();
-      }).catch(e => console.error(e));
-    }
-
-    function openNotes(id) {
-      document.getElementById('notes-title').textContent = `Notes: ${app.tasks[id].name}`;
-      document.getElementById('notes-what').value = app.tasks[id].notes;
-      document.getElementById('notes-out').value = app.tasks[id].output;
-      document.getElementById('notes-modal').dataset.id = id;
-      document.getElementById('notes-modal').classList.add('active');
-    }
-
-    function closeNotes() {
-      document.getElementById('notes-modal').classList.remove('active');
-    }
-
-    function saveNotes() {
-      const id = document.getElementById('notes-modal').dataset.id;
-      app.tasks[id].notes = document.getElementById('notes-what').value;
-      app.tasks[id].output = document.getElementById('notes-out').value;
-      SB.from('tasks').update({notes:app.tasks[id].notes, output:app.tasks[id].output}).eq('id',id);
-      closeNotes();
-    }
+    function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
     function showTab(name) {
       document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
       document.getElementById(name).classList.add('active');
       event.target.classList.add('active');
-      if(name === 'allocate') renderAllocate();
-      if(name === 'settings') renderSettings();
-      if(name === 'history') renderHistory();
+    }
+
+    async function startDay() {
+      app.dayStarted = true;
+      document.getElementById('lock').classList.add('hidden');
+      document.getElementById('stop-btn').disabled = false;
+      await loadTasks();
+    }
+
+    function stopDay() {
+      app.dayStarted = false;
+      document.getElementById('lock').classList.remove('hidden');
+      document.getElementById('stop-btn').disabled = true;
+    }
+
+    async function loadTasks() {
+      const {data} = await SB.from('tasks').select('*');
+      const {data:cats} = await SB.from('categories').select('*');
+      const {data:catTargs} = await SB.from('category_targets').select('*');
+      
+      app.categories = {};
+      if(cats) cats.forEach(c => app.categories[c.name] = c.color);
+      
+      app.catTargets = {};
+      if(catTargs) catTargs.forEach(t => app.catTargets[t.category] = {weekly: t.weekly_hours, daily: t.daily_minimum});
+      
+      app.tasks = {};
+      if(data) {
+        data.forEach(t => {
+          app.tasks[t.id] = {id:t.id, name:t.name, cat:t.category, sec:0, color:t.color, start_time:t.start_time, notes:t.notes, output:t.output, weekly:t.weekly_hours, daily:t.daily_minimum};
+          if(t.start_time) app.dayStarted = true;
+        });
+      }
+      
+      // Update category dropdown
+      const select = document.getElementById('task-cat');
+      select.innerHTML = '';
+      Object.keys(app.categories).forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      
+      renderTiles();
+      renderAllocate();
+      renderSettings();
+      if(app.dayStarted) document.getElementById('lock').classList.add('hidden');
+    }
+
+    function renderTiles() {
+      const tiles = document.getElementById('tiles');
+      tiles.innerHTML = '';
+      Object.entries(app.tasks).forEach(([id, t]) => {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.dataset.id = id;
+        const color = app.categories[t.cat] || '#3b82f6';
+        tile.style.background = `linear-gradient(135deg, ${color}, ${color}dd)`;
+        
+        let elapsed = 0;
+        if(t.start_time) {
+          elapsed = Math.floor((new Date() - new Date(t.start_time)) / 1000);
+        }
+        
+        tile.innerHTML = `
+          <div class="tile-head">
+            <div class="tile-label">${t.cat}</div>
+            <button class="tile-handle">⋮⋮</button>
+          </div>
+          <div class="tile-name">${t.name}</div>
+          <div class="tile-time">${fmt(elapsed)}</div>
+          <div class="tile-btns">
+            <button class="tile-btn" onclick="startTask(${id})">Start</button>
+            <button class="tile-btn" onclick="stopTask(${id})">Stop</button>
+            <button class="tile-btn" onclick="deleteTask(${id})">Delete</button>
+          </div>
+        `;
+        tiles.appendChild(tile);
+      });
     }
 
     function renderAllocate() {
       const grid = document.getElementById('allocate-grid');
-      grid.innerHTML = '';
-      
-      // Categories header
-      const catHeader = document.createElement('div');
-      catHeader.style.cssText = 'grid-column: 1/-1; font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; color: #e5e5e5;';
-      catHeader.textContent = 'Categories';
-      grid.appendChild(catHeader);
-      
-      // Category cards with editable targets
+      grid.innerHTML = '<h2 style="grid-column: 1/-1; margin-bottom: 2rem;">Category Targets</h2>';
       Object.entries(app.categories).forEach(([name, color]) => {
-        const taskCount = Object.values(app.tasks).filter(t => t.cat === name).length;
-        const catTotal = Object.values(app.tasks).filter(t => t.cat === name).reduce((s,t) => s+t.weekly, 0);
-        const catTarget = app.catTargets[name] || {weekly: 0, daily: 0};
-        const daily = (catTarget.weekly / 7).toFixed(1);
-        
+        const target = app.catTargets[name] || {weekly: 0, daily: 0};
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div class="color-dot" style="background-color: ${color}; width: 16px; height: 16px;"></div>
-            <div>
-              <div style="font-size: 14px; font-weight: 600; color: #e5e5e5;">${name}</div>
-              <div style="font-size: 12px; color: #999;">${taskCount} task${taskCount !== 1 ? 's' : ''}</div>
-            </div>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 16px; height: 16px; background: ${color}; border-radius: 4px;"></div>
+            <div style="font-weight: 600;">${name}</div>
           </div>
-          <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 11px; color: #999; text-transform: uppercase; margin-bottom: 6px; font-weight: 600;">Target weekly</label>
-              <div style="display: flex; gap: 6px;">
-                <input type="number" class="alloc-input" value="${catTarget.weekly}" onchange="updateCatTarget('${name}', 'w', this.value)" style="flex: 1;" />
-                <div style="width: 30px; text-align: center; color: #999; font-size: 12px;">h</div>
-              </div>
-            </div>
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 11px; color: #999; text-transform: uppercase; margin-bottom: 6px; font-weight: 600;">Target daily</label>
-              <div style="display: flex; gap: 6px;">
-                <input type="number" step="0.5" class="alloc-input" value="${catTarget.daily}" onchange="updateCatTarget('${name}', 'd', this.value)" style="flex: 1;" />
-                <div style="width: 30px; text-align: center; color: #999; font-size: 12px;">h</div>
-              </div>
-            </div>
+          <div style="margin-bottom: 8px;">
+            <label style="font-size: 12px; color: #999;">Weekly target (hours)</label>
+            <input type="number" value="${target.weekly}" onchange="updateCatTarget('${name}', 'w', this.value)" style="width: 100%; padding: 8px; background: #0f0f0f; color: #e5e5e5; border: 0.5px solid #333; border-radius: 4px; margin-top: 4px;">
           </div>
-          <div style="background: #0f0f0f; padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-              <span style="color: #999;">Tasks total:</span>
-              <span style="color: #60a5fa; font-weight: 600; font-family: monospace;">${catTotal}h/week</span>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #999;">Daily auto:</span>
-              <span style="color: #60a5fa; font-weight: 600; font-family: monospace;">~${(catTotal/7).toFixed(1)}h</span>
-            </div>
-          </div>
-        `;
-        grid.appendChild(card);
-      });
-      
-      // Tasks header
-      const taskHeader = document.createElement('div');
-      taskHeader.style.cssText = 'grid-column: 1/-1; font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; margin-top: 2rem; color: #e5e5e5;';
-      taskHeader.textContent = 'Task Targets';
-      grid.appendChild(taskHeader);
-      
-      // Task cards
-      Object.entries(app.tasks).forEach(([id, t]) => {
-        const daily = (t.weekly / 7).toFixed(1);
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <div class="color-dot" style="background-color: ${app.categories[t.cat]}; width: 16px; height: 16px;"></div>
-            <div style="flex: 1;">
-              <div style="font-size: 14px; font-weight: 600; color: #e5e5e5;">${t.name}</div>
-              <div style="font-size: 11px; color: #999; text-transform: uppercase;">${t.cat}</div>
-            </div>
-          </div>
-          <div style="display: flex; gap: 12px; margin-bottom: 12px;">
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 11px; color: #999; text-transform: uppercase; margin-bottom: 6px; font-weight: 600;">Weekly</label>
-              <div style="display: flex; gap: 6px;">
-                <input type="number" class="alloc-input" value="${t.weekly}" onchange="updateAlloc(${id}, 'w', this.value)" style="flex: 1;" />
-                <div style="width: 30px; text-align: center; color: #999; font-size: 12px;">h</div>
-              </div>
-            </div>
-            <div style="flex: 1;">
-              <label style="display: block; font-size: 11px; color: #999; text-transform: uppercase; margin-bottom: 6px; font-weight: 600;">Daily min</label>
-              <div style="display: flex; gap: 6px;">
-                <input type="number" step="0.5" class="alloc-input" value="${t.daily}" onchange="updateAlloc(${id}, 'd', this.value)" style="flex: 1;" />
-                <div style="width: 30px; text-align: center; color: #999; font-size: 12px;">h</div>
-              </div>
-            </div>
-          </div>
-          <div style="background: #0f0f0f; padding: 10px; border-radius: 8px; font-size: 12px; color: #999;">
-            Daily target: <span style="color: #60a5fa; font-weight: 600; font-family: monospace;">~${daily}h</span>
+          <div>
+            <label style="font-size: 12px; color: #999;">Daily minimum (hours)</label>
+            <input type="number" value="${target.daily}" onchange="updateCatTarget('${name}', 'd', this.value)" style="width: 100%; padding: 8px; background: #0f0f0f; color: #e5e5e5; border: 0.5px solid #333; border-radius: 4px; margin-top: 4px;">
           </div>
         `;
         grid.appendChild(card);
@@ -770,159 +232,115 @@
     }
 
     function renderSettings() {
-      const container = document.getElementById('settings-container');
-      container.innerHTML = `
-        <div class="card" style="max-width: 600px;">
-          <div class="modal-title">Categories</div>
-          <div id="categories-list"></div>
-          <div style="margin-top: 2rem; display: flex; gap: 12px;">
-            <input type="text" id="new-cat-name" placeholder="Category name" style="flex: 1;" />
-            <button class="btn-add" onclick="addCategory()">Add</button>
-          </div>
-        </div>
-      `;
-      
-      const catList = document.getElementById('categories-list');
+      const settings = document.getElementById('settings-content');
+      settings.innerHTML = '<h2 style="margin-bottom: 2rem;">Categories</h2>';
       Object.entries(app.categories).forEach(([name, color]) => {
         const item = document.createElement('div');
-        item.style.cssText = 'display:flex; align-items:center; gap:12px; padding:12px; background:#0f0f0f; border:0.5px solid #333; border-radius:8px; margin-bottom:8px;';
+        item.style.cssText = 'display:flex; align-items:center; gap:12px; padding:12px; background:#1a1a1a; border:0.5px solid #333; border-radius:8px; margin-bottom:8px;';
         item.innerHTML = `
-          <input type="color" value="${color}" onchange="updateCatColor('${name}', this.value)" style="width:40px; height:40px; border:none; border-radius:6px; cursor:pointer;" />
-          <input type="text" value="${name}" style="flex:1; background:#1a1a1a; color:#e5e5e5; border:0.5px solid #333; padding:8px; border-radius:6px; font-size:14px;" onchange="renameCat('${name}', this.value)" />
-          <button class="btn-cancel" style="padding:6px 12px; font-size:12px;" onclick="deleteCat('${name}')">Delete</button>
+          <input type="color" value="${color}" onchange="updateCatColor('${name}', this.value)" style="width:40px; height:40px; border:none; border-radius:6px; cursor:pointer;">
+          <input type="text" value="${name}" style="flex:1; background:#0f0f0f; color:#e5e5e5; border:0.5px solid #333; padding:8px; border-radius:6px; font-size:14px;" onchange="renameCat('${name}', this.value)">
+          <button class="btn btn-primary" onclick="deleteCat('${name}')" style="padding: 8px 16px;">Delete</button>
         `;
-        catList.appendChild(item);
+        settings.appendChild(item);
+      });
+      
+      const addDiv = document.createElement('div');
+      addDiv.style.cssText = 'margin-top: 2rem; display: flex; gap: 12px;';
+      addDiv.innerHTML = `
+        <input type="text" id="new-cat-name" placeholder="New category name" style="flex: 1; padding: 12px; background: #1a1a1a; color: #e5e5e5; border: 0.5px solid #333; border-radius: 8px;">
+        <button class="btn btn-primary" onclick="addCategory()" style="padding: 12px 24px;">+ Add</button>
+      `;
+      settings.appendChild(addDiv);
+    }
+
+    function addTask() {
+      if(!app.dayStarted) return;
+      const name = document.getElementById('task-name').value.trim();
+      const cat = document.getElementById('task-cat').value;
+      if(!name) return;
+      
+      SB.from('tasks').insert({name, category:cat, color:app.categories[cat]||'#3b82f6'}).then(() => {
+        document.getElementById('task-name').value = '';
+        loadTasks();
       });
     }
 
-    function addCategory() {
-      const input = document.getElementById('new-cat-name');
-      const name = input.value.trim();
-      if(!name) {
-        alert('Category name required');
-        return;
+    function startTask(id) {
+      if(!app.dayStarted) return;
+      if(app.currentTask && app.currentTask !== id) stopTask(app.currentTask);
+      app.currentTask = id;
+      const now = new Date().toISOString();
+      app.tasks[id].start_time = now;
+      SB.from('tasks').update({start_time: now}).eq('id', id);
+      
+      if(!app.timerInt) {
+        app.timerInt = setInterval(() => {
+          renderTiles();
+        }, 1000);
       }
-      SB.from('categories').insert({name, color:'#999'}).then(res => {
-        if(res.error) {
-          console.error(res.error);
-          alert('Error: ' + res.error.message);
-          return;
-        }
-        app.categories[name] = '#999';
-        // Also create category_targets entry
-        SB.from('category_targets').insert({category:name, weekly_hours:0, daily_minimum:0}).then(() => {
-          // Update the task category dropdown
-          const select = document.getElementById('task-cat');
-          const option = document.createElement('option');
-          option.value = name;
-          option.textContent = name;
-          select.appendChild(option);
-          
-          renderSettings();
-          input.value = '';
-        }).catch(e => {
-          console.error(e);
-          alert('Error creating target: ' + e.message);
-        });
-      }).catch(e => {
-        console.error(e);
-        alert('Error adding category: ' + e.message);
-      });
+    }
+
+    function stopTask(id) {
+      if(app.currentTask === id) {
+        app.currentTask = null;
+        if(app.timerInt) clearInterval(app.timerInt);
+        app.timerInt = null;
+      }
+      SB.from('tasks').update({start_time: null}).eq('id', id);
+      renderTiles();
+    }
+
+    function deleteTask(id) {
+      SB.from('tasks').delete().eq('id', id).then(() => loadTasks());
     }
 
     function updateCatColor(name, color) {
       app.categories[name] = color;
       SB.from('categories').update({color}).eq('name', name).then(() => {
-        Object.entries(app.tasks).forEach(([id, t]) => {
-          if(t.cat === name) t.color = colorMap[name] || 'blue';
-        });
-        if(app.dayStarted) renderTiles();
-      }).catch(e => console.error(e));
+        Object.values(app.tasks).forEach(t => { if(t.cat === name) t.color = color; });
+        renderTiles();
+        renderAllocate();
+        renderSettings();
+      });
     }
 
     function renameCat(oldName, newName) {
-      if(!newName.trim() || newName === oldName) return;
-      SB.from('categories').delete().eq('name', oldName).then(() => {
-        SB.from('categories').insert({name:newName, color:app.categories[oldName]}).then(() => {
-          delete app.categories[oldName];
-          app.categories[newName] = app.categories[oldName];
-          Object.entries(app.tasks).forEach(([id, t]) => {
-            if(t.cat === oldName) t.cat = newName;
-          });
-          renderSettings();
-          if(app.dayStarted) renderTiles();
-        });
-      }).catch(e => console.error(e));
+      if(!newName.trim()) return;
+      SB.from('categories').update({name: newName}).eq('name', oldName).then(() => {
+        SB.from('category_targets').update({category: newName}).eq('category', oldName);
+        loadTasks();
+      });
     }
 
     function deleteCat(name) {
-      if(Object.keys(app.categories).length <= 1) {
-        alert('Must have at least one category');
-        return;
-      }
-      SB.from('categories').delete().eq('name', name).then(() => {
-        SB.from('category_targets').delete().eq('category', name).catch(e => console.error(e));
-        delete app.categories[name];
-        delete app.catTargets[name];
-        renderSettings();
-      }).catch(e => console.error(e));
+      if(Object.keys(app.categories).length <= 1) { alert('Must have at least one category'); return; }
+      SB.from('categories').delete().eq('name', name).then(() => loadTasks());
     }
 
-    function updateAlloc(id, type, val) {
-      if(type === 'w') app.tasks[id].weekly = parseFloat(val) || 0;
-      else app.tasks[id].daily = parseFloat(val) || 0;
-      SB.from('tasks').update({weekly_hours:app.tasks[id].weekly, daily_minimum:app.tasks[id].daily}).eq('id',id).catch(e => console.error(e));
+    function addCategory() {
+      const name = document.getElementById('new-cat-name').value.trim();
+      if(!name) return;
+      SB.from('categories').insert({name, color:'#999'}).then(() => {
+        SB.from('category_targets').insert({category:name, weekly_hours:0, daily_minimum:0}).then(() => {
+          loadTasks();
+          document.getElementById('new-cat-name').value = '';
+        });
+      });
     }
 
     function updateCatTarget(name, type, val) {
       if(!app.catTargets[name]) app.catTargets[name] = {weekly: 0, daily: 0};
       if(type === 'w') app.catTargets[name].weekly = parseFloat(val) || 0;
       else app.catTargets[name].daily = parseFloat(val) || 0;
-      
       SB.from('category_targets').update({
         weekly_hours: app.catTargets[name].weekly,
         daily_minimum: app.catTargets[name].daily
-      }).eq('category', name).catch(e => console.error(e));
-    }
-
-    function renderHistory() {
-      SB.from('history').select('*').order('created_at', {ascending:false}).then(({data, error}) => {
-        if(error) { console.error(error); return; }
-        const grid = document.getElementById('history-grid');
-        grid.innerHTML = '';
-        if(!data || data.length === 0) {
-          grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#999;">No history</div>';
-          return;
-        }
-        data.forEach(entry => {
-          const card = document.createElement('div');
-          card.className = 'card';
-          card.innerHTML = `
-            <div class="card-title">
-              ${entry.date}
-              <button class="btn-cancel" style="padding:4px 8px; font-size:11px;" onclick="SB.from('history').delete().eq('id',${entry.id})">Delete</button>
-            </div>
-            <div class="card-stat">
-              <span class="stat-label">Time</span>
-              <span class="stat-value">${entry.total_time}</span>
-            </div>
-            <div class="card-stat">
-              <span class="stat-label">Tasks</span>
-              <span class="stat-value">${entry.tasks_count}</span>
-            </div>
-            ${entry.notes ? `<div style="border-top:0.5px solid #333; margin-top:12px; padding-top:12px; font-size:12px; color:#999;">Notes: ${entry.notes}</div>` : ''}
-          `;
-          grid.appendChild(card);
-        });
-      });
-    }
-
-    function closeSettings() {
-      // No longer needed - settings is a tab now
+      }).eq('category', name);
     }
 
     updateTime();
-    document.getElementById('lock').style.display = 'flex';
+    setInterval(updateTime, 1000);
     loadTasks();
   </script>
 </body>
