@@ -29,12 +29,12 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 14px;
       line-height: 1.5;
-      padding: 24px 20px;
+      padding: 16px 16px;
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
     }
 
-    .container { max-width: 1100px; margin: 0 auto; }
+    .container { max-width: 1400px; margin: 0 auto; }
 
     /* HEADER */
     .header {
@@ -115,16 +115,15 @@
     .tab.active { color: var(--text); border-bottom-color: var(--text); }
 
     /* CONTENT */
-    .content { display: none; position: relative; }
+    .content { display: none; position: relative; overflow: visible; }
     .content.active { display: block; }
 
     /* LOCK */
     .lock {
       position: absolute; top: 0; left: 0; right: 0;
-      min-height: 340px; height: 100%;
+      min-height: 340px;
       display: flex; align-items: center; justify-content: center;
       z-index: 100;
-      overflow: hidden;
       background: var(--bg);
     }
     .lock.hidden { display: none; }
@@ -200,7 +199,7 @@
       margin-bottom: 24px;
       flex-wrap: wrap;
     }
-    .add-task input, .add-task select {
+    .add-task input {
       flex: 1;
       min-width: 120px;
       padding: 9px 12px;
@@ -209,20 +208,35 @@
       border: 1px solid var(--border);
       border-radius: 7px;
       font-size: 13px;
+      font-family: inherit;
     }
     .add-task input::placeholder { color: var(--text3); }
-    .add-task input:focus, .add-task select:focus { outline: none; border-color: var(--border2); }
-    .add-task select option { background: var(--bg2); }
+    .add-task input:focus { outline: none; border-color: var(--border2); }
+    .cat-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+      transition: background 0.1s;
+      border-left: 3px solid transparent;
+    }
+    .cat-option:hover { background: var(--bg2); }
+    .cat-option.selected { background: var(--bg2); }
+    .cat-option-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
     /* TILES */
     .tiles {
       position: relative;
-      min-height: 360px;
+      min-height: 200px;
       margin-bottom: 2rem;
+      overflow: visible;
     }
     .tile {
       position: absolute;
-      width: 240px;
+      width: 195px;
       padding: 16px 18px 14px;
       border-radius: var(--radius);
       border: 1px solid transparent;
@@ -661,7 +675,9 @@
   <!-- CONTROLS -->
   <div class="controls">
     <button class="btn btn-danger" id="stop-day-btn" onclick="triggerStopDay()" disabled>End day</button>
+    <button class="btn" id="pause-day-btn" onclick="togglePauseDay()" disabled style="display:none;">⏸ Pause</button>
     <span class="day-status" id="day-status">Day not started</span>
+    <span id="pause-indicator" style="display:none;font-size:12px;color:#f59e0b;font-weight:500;">⏸ Paused — <span id="pause-since"></span></span>
   </div>
 
   <!-- TABS -->
@@ -688,9 +704,36 @@
     </div>
     <div class="add-task">
       <input type="text" id="task-name" placeholder="Task name" onkeydown="if(event.key==='Enter')addTask()">
-      <div style="position:relative;flex:1;min-width:140px;display:flex;align-items:center;">
-        <span id="cat-swatch" style="position:absolute;left:10px;width:10px;height:10px;border-radius:50%;background:#888;pointer-events:none;z-index:1;"></span>
-        <select id="task-cat" style="padding-left:28px;width:100%;"></select>
+      <div style="position:relative;flex:1;min-width:140px;" id="cat-dropdown-wrap">
+        <div id="cat-selected" onclick="toggleCatDropdown()" style="
+          display:flex;align-items:center;gap:8px;
+          padding:9px 12px;
+          background:var(--bg1);
+          border:1px solid var(--border);
+          border-radius:7px;
+          cursor:pointer;
+          font-size:13px;
+          color:var(--text);
+          user-select:none;
+          transition:border-color 0.12s;
+        ">
+          <span id="cat-sel-dot" style="width:10px;height:10px;border-radius:50%;background:#888;flex-shrink:0;"></span>
+          <span id="cat-sel-name" style="flex:1;">Select category</span>
+          <span style="color:var(--text3);font-size:10px;">▼</span>
+        </div>
+        <div id="cat-dropdown-list" style="
+          display:none;
+          position:absolute;
+          top:calc(100% + 4px);
+          left:0;right:0;
+          background:var(--bg1);
+          border:1px solid var(--border2);
+          border-radius:8px;
+          overflow:hidden;
+          z-index:500;
+          box-shadow:0 8px 24px rgba(0,0,0,0.5);
+        "></div>
+        <input type="hidden" id="task-cat">
       </div>
       <button class="btn" onclick="addTask()">Add</button>
     </div>
@@ -718,12 +761,38 @@
 
   <!-- HISTORY -->
   <div id="history" class="content">
-    <div id="history-content"><div class="empty"><div class="empty-icon">📅</div>No history yet</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:16px;font-weight:600;">History</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="history-search" placeholder="Search..." oninput="loadHistory()"
+          style="padding:7px 12px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:13px;width:160px;">
+        <select id="history-filter" onchange="loadHistory()"
+          style="padding:7px 10px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:13px;">
+          <option value="all">All time</option>
+          <option value="thismonth">This month</option>
+          <option value="lastmonth">Last month</option>
+          <option value="last30">Last 30 days</option>
+          <option value="last90">Last 90 days</option>
+        </select>
+      </div>
+    </div>
+    <div id="history-content"></div>
   </div>
 
   <!-- WEEKLY -->
   <div id="weekly" class="content">
-    <div id="weekly-content"><div class="empty"><div class="empty-icon">📊</div>No data yet</div></div>
+    <!-- Week navigation -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="btn" onclick="weekNav(-1)">← Prev</button>
+      <button class="btn" onclick="weekNav(1)" id="week-next-btn">Next →</button>
+      <button class="btn" onclick="weekNav(0)" id="week-this-btn">This week</button>
+      <div style="flex:1;text-align:center;">
+        <span id="week-label-nav" style="font-size:15px;font-weight:600;color:var(--text);"></span>
+      </div>
+      <input type="week" id="week-picker" onchange="weekPickerChange(this.value)"
+        style="padding:7px 10px;background:var(--bg1);color:var(--text);border:1px solid var(--border);border-radius:7px;font-size:13px;">
+    </div>
+    <div id="weekly-content"></div>
   </div>
 
 </div>
@@ -750,6 +819,30 @@
       <button class="btn btn-confirm" onclick="saveEditTask()">Save</button>
       <button class="btn" onclick="closeEditModal()">Cancel</button>
       <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteTaskFromEdit()">Delete task</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAY CONFLICT MODAL -->
+<div class="modal-overlay hidden" id="day-conflict-modal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2>Session already exists</h2>
+      <div class="modal-sub">You already tracked time on <span id="conflict-date"></span> — <strong id="conflict-time"></strong> logged.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-confirm" onclick="closeConflictModal();startDay('continue');" style="text-align:left;padding:12px 16px;">
+        <div style="font-weight:600;margin-bottom:2px;">Continue existing session</div>
+        <div style="font-size:12px;font-weight:400;opacity:0.7;">Add to today's logged time — nothing is lost</div>
+      </button>
+      <button class="btn" onclick="closeConflictModal();startDay('new-session');" style="text-align:left;padding:12px 16px;">
+        <div style="font-weight:600;margin-bottom:2px;">Start a new session today</div>
+        <div style="font-size:12px;font-weight:400;opacity:0.7;">Reset task timers — existing history is kept</div>
+      </button>
+      <button class="btn btn-danger" onclick="closeConflictModal();" style="text-align:left;padding:12px 16px;">
+        <div style="font-weight:600;margin-bottom:2px;">Cancel</div>
+        <div style="font-size:12px;font-weight:400;opacity:0.7;">Go back without starting</div>
+      </button>
     </div>
   </div>
 </div>
@@ -812,6 +905,9 @@
   let app = {
     dayStarted: false,
     dayDate: null,
+    paused: false,
+    pauseStart: null,
+    pauseLog: [],
     tasks: {},
     categories: {},
     catTargets: {},
@@ -886,17 +982,83 @@
   }
 
   // ─── DAY START / STOP ─────────────────────────────────────────
-  async function startDay() {
-    app.dayStarted = true;
-    // Store the date the day started on (not calendar date at stop time)
-    if (!app.dayDate) {
-      app.dayDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
-      LS.set('tt_day_date', app.dayDate);
+  async function startDay(mode) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const logs = LS.get('tt_daily_logs', []);
+    const existingLog = logs.find(l => l.date === today);
+
+    // No mode passed — check if there's existing data for today
+    if (!mode && existingLog && existingLog.total_seconds > 0) {
+      showDayConflictModal(existingLog);
+      return;
     }
+
+    if (mode === 'new-session') {
+      // Start fresh — clear task timers but keep tasks on board
+      Object.values(app.tasks).forEach(t => { t.total_seconds = 0; t.start_time = null; });
+      saveTasks();
+    }
+    // mode === 'continue' or first time: just open as normal
+
+    app.dayStarted = true;
+    app.dayDate = today;
+    LS.set('tt_day_date', today);
     document.getElementById('lock').classList.add('hidden');
     document.getElementById('stop-day-btn').disabled = false;
+    document.getElementById('pause-day-btn').disabled = false;
+    document.getElementById('pause-day-btn').style.display = 'inline-block';
     document.getElementById('day-status').textContent = 'Day in progress';
     startTicker();
+  }
+
+  function showDayConflictModal(existingLog) {
+    const modal = document.getElementById('day-conflict-modal');
+    if (!modal) return;
+    document.getElementById('conflict-date').textContent = new Date(existingLog.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('conflict-time').textContent = fmtHours(existingLog.total_seconds || 0);
+    modal.classList.remove('hidden');
+  }
+
+  function closeConflictModal() {
+    document.getElementById('day-conflict-modal').classList.add('hidden');
+  }
+
+  // ─── PAUSE ────────────────────────────────────────────────────
+  function togglePauseDay() {
+    if (app.paused) {
+      resumeDay();
+    } else {
+      pauseDay();
+    }
+  }
+
+  function pauseDay() {
+    // Stop any running task
+    if (app.currentTask) stopTask(app.currentTask, true);
+    app.paused = true;
+    app.pauseStart = new Date().toISOString();
+    if (!app.pauseLog) app.pauseLog = [];
+    LS.set('tt_pause_start', app.pauseStart);
+    document.getElementById('pause-day-btn').textContent = '▶ Resume';
+    document.getElementById('pause-day-btn').style.color = '#f59e0b';
+    document.getElementById('day-status').textContent = 'Paused';
+    document.getElementById('pause-indicator').style.display = 'inline';
+    document.getElementById('pause-since').textContent = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    renderTiles();
+  }
+
+  function resumeDay() {
+    app.paused = false;
+    const pauseEnd = new Date().toISOString();
+    if (!app.pauseLog) app.pauseLog = [];
+    app.pauseLog.push({ start: app.pauseStart, end: pauseEnd });
+    LS.set('tt_pause_log', app.pauseLog);
+    LS.set('tt_pause_start', null);
+    app.pauseStart = null;
+    document.getElementById('pause-day-btn').textContent = '⏸ Pause';
+    document.getElementById('pause-day-btn').style.color = '';
+    document.getElementById('day-status').textContent = 'Day in progress';
+    document.getElementById('pause-indicator').style.display = 'none';
   }
 
   function triggerStopDay() {
@@ -923,6 +1085,12 @@
     });
 
     const totalSec = Object.values(catTotals).reduce((a, b) => a + b, 0);
+    // Calculate total pause time to store separately
+    const pauseLogs = app.pauseLog || [];
+    const totalPauseSec = pauseLogs.reduce((sum, p) => {
+      if (p.start && p.end) return sum + Math.floor((new Date(p.end) - new Date(p.start)) / 1000);
+      return sum;
+    }, 0);
 
     // Build task breakdown JSON
     const taskBreakdown = Object.values(app.tasks).map(t => ({
@@ -938,7 +1106,9 @@
       cat_breakdown: catTotals,
       task_breakdown: taskBreakdown,
       notes: note || null,
-      cat_targets: app.catTargets
+      cat_targets: app.catTargets,
+      pause_seconds: totalPauseSec,
+      pause_log: pauseLogs
     };
 
     const logs = LS.get('tt_daily_logs', []);
@@ -953,11 +1123,18 @@
     closeEodModal();
     app.dayStarted = false;
     app.dayDate = null;
+    app.paused = false;
+    app.pauseLog = [];
     LS.set('tt_day_date', null);
+    LS.set('tt_pause_start', null);
+    LS.set('tt_pause_log', []);
     app.currentTask = null;
     if (app.timerInt) { clearInterval(app.timerInt); app.timerInt = null; }
     document.getElementById('lock').classList.remove('hidden');
     document.getElementById('stop-day-btn').disabled = true;
+    document.getElementById('pause-day-btn').disabled = true;
+    document.getElementById('pause-day-btn').style.display = 'none';
+    document.getElementById('pause-indicator').style.display = 'none';
     document.getElementById('day-status').textContent = 'Day saved ✓';
     await loadTasks();
   }
@@ -974,6 +1151,12 @@
     });
 
     const totalSec = Object.values(catTotals).reduce((a, b) => a + b, 0);
+    // Calculate total pause time to store separately
+    const pauseLogs = app.pauseLog || [];
+    const totalPauseSec = pauseLogs.reduce((sum, p) => {
+      if (p.start && p.end) return sum + Math.floor((new Date(p.end) - new Date(p.start)) / 1000);
+      return sum;
+    }, 0);
 
     // Category rows
     const catsEl = document.getElementById('eod-cats');
@@ -1024,6 +1207,14 @@
     app.catTargets = LS.get('tt_targets', {});
     app.tasks = LS.get('tt_tasks', {});
     app.dayDate = LS.get('tt_day_date', null);
+    app.pauseLog = LS.get('tt_pause_log', []);
+    app.pauseStart = LS.get('tt_pause_start', null);
+    if (app.pauseStart) {
+      app.paused = true;
+      document.getElementById('pause-day-btn').textContent = '▶ Resume';
+      document.getElementById('pause-indicator').style.display = 'inline';
+      document.getElementById('pause-since').textContent = new Date(app.pauseStart).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    }
 
     let anyRunning = false;
     Object.values(app.tasks).forEach(t => {
@@ -1049,24 +1240,70 @@
   function saveTargets() { LS.set('tt_targets', app.catTargets); }
 
   function updateCatDropdown() {
-    const sel = document.getElementById('task-cat');
-    const swatch = document.getElementById('cat-swatch');
-    const prev = sel.value;
-    sel.innerHTML = '';
-    Object.entries(app.categories).forEach(([name, color]) => {
-      const o = document.createElement('option');
-      o.value = name;
-      o.textContent = name;
-      if (name === prev) o.selected = true;
-      sel.appendChild(o);
+    const hidden = document.getElementById('task-cat');
+    const list = document.getElementById('cat-dropdown-list');
+    const selDot = document.getElementById('cat-sel-dot');
+    const selName = document.getElementById('cat-sel-name');
+    const selBox = document.getElementById('cat-selected');
+    if (!list) return;
+
+    const cats = Object.entries(app.categories);
+    if (!cats.length) return;
+
+    // Set default selection if none
+    if (!hidden.value || !app.categories[hidden.value]) {
+      hidden.value = cats[0][0];
+    }
+
+    // Update selected display
+    const selColor = app.categories[hidden.value] || '#888';
+    if (selDot) { selDot.style.background = selColor; }
+    if (selName) selName.textContent = hidden.value;
+    if (selBox) selBox.style.borderColor = selColor + '88';
+
+    // Build option list
+    list.innerHTML = '';
+    cats.forEach(([name, color]) => {
+      const opt = document.createElement('div');
+      opt.className = 'cat-option' + (name === hidden.value ? ' selected' : '');
+      opt.style.borderLeftColor = color;
+      opt.innerHTML = '<span class="cat-option-dot" style="background:' + color + '"></span>' + name;
+      opt.addEventListener('click', () => {
+        hidden.value = name;
+        if (selDot) selDot.style.background = color;
+        if (selName) selName.textContent = name;
+        if (selBox) selBox.style.borderColor = color + '88';
+        // Mark selected
+        list.querySelectorAll('.cat-option').forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        closeCatDropdown();
+      });
+      list.appendChild(opt);
     });
-    const updateSwatchColor = () => {
-      const color = app.categories[sel.value] || '#888';
-      if (swatch) swatch.style.background = color;
-      sel.style.borderColor = color + '88';
-    };
-    updateSwatchColor();
-    sel.onchange = updateSwatchColor;
+  }
+
+  function toggleCatDropdown() {
+    const list = document.getElementById('cat-dropdown-list');
+    if (!list) return;
+    const isOpen = list.style.display === 'block';
+    if (isOpen) { closeCatDropdown(); } else {
+      list.style.display = 'block';
+      // Close on outside click
+      setTimeout(() => {
+        document.addEventListener('click', closeCatDropdownOutside);
+      }, 0);
+    }
+  }
+
+  function closeCatDropdown() {
+    const list = document.getElementById('cat-dropdown-list');
+    if (list) list.style.display = 'none';
+    document.removeEventListener('click', closeCatDropdownOutside);
+  }
+
+  function closeCatDropdownOutside(e) {
+    const wrap = document.getElementById('cat-dropdown-wrap');
+    if (wrap && !wrap.contains(e.target)) closeCatDropdown();
   }
 
   // ─── TICKER ───────────────────────────────────────────────────
@@ -1081,13 +1318,33 @@
   }
 
   // ─── GRID CONSTANTS ───────────────────────────────────────────
-  const TILE_W = 252; // tile width + gap
-  const TILE_H = 200; // tile height + gap (increased to prevent overlap)
+  const TILE_W = 207; // tile width + gap
+  const TILE_H = 188; // tile height + gap
   const TILE_COLS = () => Math.max(1, Math.floor((document.getElementById('tiles').offsetWidth + 12) / TILE_W));
 
   function gridPos(idx) {
     const cols = TILE_COLS();
     return { x: (idx % cols) * TILE_W, y: Math.floor(idx / cols) * TILE_H };
+  }
+
+  function findNextEmptySlot() {
+    // Get all occupied grid slots
+    const occupied = new Set();
+    Object.values(app.tasks).forEach(t => {
+      if (t.x !== undefined && t.y !== undefined) {
+        occupied.add(t.x + ',' + t.y);
+      }
+    });
+    // Find first unoccupied slot
+    const cols = TILE_COLS() || 5;
+    for (let row = 0; row < 100; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = col * TILE_W;
+        const y = row * TILE_H;
+        if (!occupied.has(x + ',' + y)) return { x, y };
+      }
+    }
+    return { x: 0, y: Object.keys(app.tasks).length * TILE_H };
   }
 
   function snapToGrid(px, py) {
@@ -1103,7 +1360,7 @@
     if (ids.length === 0) { container.style.minHeight = '180px'; return; }
     let maxY = 0;
     ids.forEach(id => { const t = app.tasks[id]; maxY = Math.max(maxY, (t.y || 0) + TILE_H); });
-    container.style.minHeight = (maxY + 20) + 'px';
+    container.style.minHeight = (maxY + 60) + 'px';
   }
 
   // ─── RENDER TILES ─────────────────────────────────────────────
@@ -1250,9 +1507,7 @@
     const cat = document.getElementById('task-cat').value;
     if (!name) return;
     const id = Date.now().toString();
-    const idx = Object.keys(app.tasks).length;
-    const cols = TILE_COLS();
-    const pos = { x: (idx % cols) * TILE_W, y: Math.floor(idx / cols) * TILE_H };
+    const pos = findNextEmptySlot();
     app.tasks[id] = { id, name, cat, color: app.categories[cat] || '#6366f1', total_seconds: 0, start_time: null, x: pos.x, y: pos.y };
     saveTasks();
     document.getElementById('task-name').value = '';
@@ -1650,9 +1905,9 @@
     loadTasks();
   }
 
-  // ─── HISTORY ACTIONS ──────────────────────────────────────────
+  // ─── HISTORY ──────────────────────────────────────────────────
   function deleteHistoryDay(date) {
-    if (!confirm('Delete this day from history? This cannot be undone.')) return;
+    if (!confirm('Delete this day from history?')) return;
     const logs = LS.get('tt_daily_logs', []).filter(l => l.date !== date);
     LS.set('tt_daily_logs', logs);
     loadHistory();
@@ -1662,262 +1917,435 @@
     const logs = LS.get('tt_daily_logs', []);
     const log = logs.find(l => l.date === date);
     if (!log) return;
-    const current = log.notes || '';
-    const newNote = prompt('Edit reflection for this day:', current);
-    if (newNote === null) return; // cancelled
+    const newNote = prompt('Edit reflection:', log.notes || '');
+    if (newNote === null) return;
     log.notes = newNote.trim();
     LS.set('tt_daily_logs', logs);
     loadHistory();
   }
 
-  // ─── HISTORY ──────────────────────────────────────────────────
   async function loadHistory() {
-    const logs = LS.get('tt_daily_logs', []).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 60);
     const el = document.getElementById('history-content');
+    if (!el) return;
 
-    if (!logs || logs.length === 0) {
-      el.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>No history yet — complete your first day to see it here</div>';
+    const search = (document.getElementById('history-search')?.value || '').toLowerCase();
+    const filter = document.getElementById('history-filter')?.value || 'all';
+
+    let logs = LS.get('tt_daily_logs', []).sort((a,b) => b.date.localeCompare(a.date));
+
+    // Filter by date range
+    const now = new Date();
+    const todayStr = toLocalDateStr(now);
+    if (filter === 'thismonth') {
+      const m = now.toLocaleDateString('en-CA').slice(0,7);
+      logs = logs.filter(l => l.date.startsWith(m));
+    } else if (filter === 'lastmonth') {
+      const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      const m = toLocalDateStr(d).slice(0,7);
+      logs = logs.filter(l => l.date.startsWith(m));
+    } else if (filter === 'last30') {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+      logs = logs.filter(l => l.date >= toLocalDateStr(cutoff));
+    } else if (filter === 'last90') {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-90);
+      logs = logs.filter(l => l.date >= toLocalDateStr(cutoff));
+    }
+
+    // Filter by search
+    if (search) {
+      logs = logs.filter(l => {
+        const tasks = (l.task_breakdown||[]).map(t=>t.name.toLowerCase()).join(' ');
+        const cats = Object.keys(l.cat_breakdown||{}).join(' ').toLowerCase();
+        const note = (l.notes||'').toLowerCase();
+        return tasks.includes(search) || cats.includes(search) || note.includes(search) || l.date.includes(search);
+      });
+    }
+
+    if (!logs.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-icon">📅</div>' + (search?'No results found':'No history yet') + '</div>';
       return;
     }
 
-    // Group by week
-    const weeks = {};
-    logs.forEach(log => {
-      const d = new Date(log.date + 'T12:00:00');
-      const monday = new Date(d);
-      monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-      const wk = monday.toISOString().slice(0, 10);
-      if (!weeks[wk]) weeks[wk] = [];
-      weeks[wk].push(log);
+    // Group by month
+    const months = {};
+    logs.forEach(l => {
+      const m = l.date.slice(0,7);
+      if (!months[m]) months[m] = [];
+      months[m].push(l);
     });
 
     el.innerHTML = '';
-    Object.entries(weeks).forEach(([weekStart, weekLogs]) => {
-      const weekEnd = new Date(weekStart + 'T12:00:00');
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      const wLabel = `Week of ${new Date(weekStart + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${weekEnd.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+    Object.entries(months).forEach(([month, monthLogs]) => {
+      const monthDate = new Date(month + '-01T12:00:00');
+      const monthLabel = monthDate.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+      const monthTotal = monthLogs.reduce((s,l)=>s+(l.total_seconds||0),0);
 
-      const weekTotal = weekLogs.reduce((s, l) => s + (l.total_seconds || 0), 0);
+      const section = document.createElement('div');
+      section.style.marginBottom = '24px';
+      section.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;">${monthLabel}</div>
+          <div style="font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums;">${monthLogs.length} days · ${fmtHours(monthTotal)}</div>
+        </div>`;
 
-      const sec = document.createElement('div');
-      sec.className = 'week-section';
-      sec.innerHTML = `<div class="week-label">${wLabel} &mdash; ${fmtHours(weekTotal)} total</div>`;
-
-      weekLogs.forEach(log => {
-        const d = new Date(log.date + 'T12:00:00');
-        const dateLabel = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      monthLogs.forEach(log => {
+        const d = new Date(log.date+'T12:00:00');
+        const dayLabel = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
         const cats = log.cat_breakdown || {};
         const tasks = log.task_breakdown || [];
 
-        const day = document.createElement('div');
-        day.className = 'history-day card';
-        day.style.marginBottom = '12px';
+        const row = document.createElement('div');
+        row.style.cssText = 'background:var(--bg1);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden;';
 
-        let catBadges = Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat, sec]) => {
-          const color = (log.cat_targets && log.cat_targets[cat] ? app.categories[cat] : null) || app.categories[cat] || '#555';
-          return `<span class="history-cat-badge" style="background:${color}22;border:0.5px solid ${color}55;color:${color}">
-            ${cat}: ${fmtHours(sec)}
-          </span>`;
+        // Summary row (always visible)
+        const summary = document.createElement('div');
+        summary.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;';
+        summary.onclick = () => {
+          const detail = row.querySelector('.hist-detail');
+          if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // Category colour dots
+        const dots = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([cat]) => {
+          const color = app.categories[cat] || '#555';
+          return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};" title="${cat}"></span>`;
         }).join('');
 
-        let taskRows = tasks.sort((a,b)=>b.seconds-a.seconds).map(t =>
-          `<div class="history-task-row"><span>${t.name} <span style="font-size:11px;color:#555;">${t.cat}</span></span><span style="font-family:monospace;">${fmtHours(t.seconds)}</span></div>`
-        ).join('');
+        summary.innerHTML = `
+          <div style="font-size:13px;font-weight:600;color:var(--text);min-width:90px;">${dayLabel}</div>
+          <div style="display:flex;gap:4px;align-items:center;">${dots}</div>
+          <div style="flex:1;font-size:12px;color:var(--text3);">
+            ${Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([cat,sec])=>`${cat}: ${fmtHours(sec)}`).join(' · ')}
+          </div>
+          ${log.notes ? '<span style="font-size:11px;color:var(--text3);">✎</span>' : ''}
+          <div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text);min-width:40px;text-align:right;">${fmtHours(log.total_seconds||0)}</div>
+          <span style="font-size:10px;color:var(--text3);">▼</span>`;
 
-        const logDate = log.date;
-        day.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <div style="color:var(--text);font-size:15px;font-weight:600;">${dateLabel}</div>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="font-variant-numeric:tabular-nums;font-size:14px;color:var(--text2);">${fmtHours(log.total_seconds||0)}</div>
-              <button onclick="editHistoryNote('${logDate}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:4px;" title="Edit note">✎</button>
-              <button onclick="deleteHistoryDay('${logDate}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:4px;" title="Delete this day">✕</button>
-            </div>
-          </div>
-          <div class="history-cats">${catBadges}</div>
-          <div class="history-tasks-list">${taskRows}</div>
-          <div id="hist-note-${logDate}">
-            ${log.notes ? `<div class="history-note">"${log.notes}"</div>` : `<div style="font-size:12px;color:var(--text3);margin-top:6px;cursor:pointer;" onclick="editHistoryNote('${logDate}')">+ Add note</div>`}
-          </div>
-        `;
-        sec.appendChild(day);
+        // Detail (hidden by default)
+        const detail = document.createElement('div');
+        detail.className = 'hist-detail';
+        detail.style.cssText = 'display:none;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg2);';
+
+        let taskRows = tasks.sort((a,b)=>b.seconds-a.seconds).map(t => {
+          const color = app.categories[t.cat] || '#555';
+          return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:var(--text2);">
+            <span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};margin-right:6px;"></span>${t.name} <span style="color:var(--text3);font-size:11px;">${t.cat}</span></span>
+            <span style="font-variant-numeric:tabular-nums;">${fmtHours(t.seconds)}</span>
+          </div>`;
+        }).join('');
+
+        detail.innerHTML = `
+          ${taskRows || '<div style="font-size:12px;color:var(--text3);">No task data</div>'}
+          ${log.notes ? `<div style="margin-top:8px;padding:6px 10px;background:var(--bg);border-radius:5px;font-size:12px;color:var(--text2);font-style:italic;">"${log.notes}"</div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn" style="padding:4px 10px;font-size:11px;" onclick="editHistoryNote('${log.date}')">✎ Edit note</button>
+            <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="deleteHistoryDay('${log.date}')">✕ Delete</button>
+          </div>`;
+
+        row.appendChild(summary);
+        row.appendChild(detail);
+        section.appendChild(row);
       });
-      el.appendChild(sec);
+
+      el.appendChild(section);
     });
   }
 
+
   // ─── WEEKLY ───────────────────────────────────────────────────
+  let weekOffset = 0; // 0 = current week, -1 = last week, etc.
+
   function getMonday(date) {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    d.setDate(d.getDate() + diff);
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
     d.setHours(0,0,0,0);
     return d;
   }
 
-  function toLocalDateStr(date) {
-    return date.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  function toLocalDateStr(d) {
+    return d.toLocaleDateString('en-CA');
+  }
+
+  function weekNav(dir) {
+    if (dir === 0) {
+      weekOffset = 0;
+    } else {
+      weekOffset += dir;
+    }
+    // Clamp — can't go into the future
+    if (weekOffset > 0) weekOffset = 0;
+    document.getElementById('week-next-btn').disabled = weekOffset >= 0;
+    document.getElementById('week-this-btn').style.opacity = weekOffset === 0 ? '0.4' : '1';
+    loadWeekly();
+  }
+
+  function weekPickerChange(val) {
+    if (!val) return;
+    // val = "2026-W18" format
+    const [year, week] = val.split('-W');
+    const d = new Date(parseInt(year), 0, 1 + (parseInt(week) - 1) * 7);
+    d.setDate(d.getDate() - (d.getDay() || 7) + 1);
+    const targetMonday = getMonday(d);
+    const currentMonday = getMonday(new Date());
+    const diff = Math.round((targetMonday - currentMonday) / (7 * 24 * 3600 * 1000));
+    weekOffset = diff;
+    if (weekOffset > 0) weekOffset = 0;
+    document.getElementById('week-next-btn').disabled = weekOffset >= 0;
+    loadWeekly();
   }
 
   async function loadWeekly() {
     const el = document.getElementById('weekly-content');
-    const allLogs = LS.get('tt_daily_logs', []);
+    if (!el) return;
 
-    // Get current Mon–Sun week
+    // On Monday mornings default to last week
     const now = new Date();
+    const isMonday = now.getDay() === 1;
+    const isMorning = now.getHours() < 12;
+    if (weekOffset === 0 && isMonday && isMorning) weekOffset = -1;
+
     const monday = getMonday(now);
+    monday.setDate(monday.getDate() + weekOffset * 7);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
 
     const weekStart = toLocalDateStr(monday);
     const weekEnd = toLocalDateStr(sunday);
 
-    const weekLogs = allLogs
-      .filter(l => l.date >= weekStart && l.date <= weekEnd)
+    // Update nav label
+    const navLabel = document.getElementById('week-label-nav');
+    if (navLabel) {
+      const isCurrentWeek = weekOffset === 0;
+      navLabel.textContent = isCurrentWeek ? 'This week' :
+        weekOffset === -1 ? 'Last week' :
+        monday.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + sunday.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    }
+
+    // Update week picker value
+    const picker = document.getElementById('week-picker');
+    if (picker) {
+      const wn = getISOWeekNumber(monday);
+      picker.value = monday.getFullYear() + '-W' + String(wn).padStart(2,'0');
+    }
+
+    const allLogs = LS.get('tt_daily_logs', []);
+    const weekLogs = allLogs.filter(l => l.date >= weekStart && l.date <= weekEnd)
       .sort((a,b) => a.date.localeCompare(b.date));
 
-    // Build full Mon–Sun map (7 days, fill gaps with 0)
+    // Build full Mon–Sun map
     const dayMap = {};
+    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      dayMap[toLocalDateStr(d)] = 0;
+      dayMap[toLocalDateStr(d)] = { sec: 0, label: dayNames[i], date: toLocalDateStr(d) };
     }
-    weekLogs.forEach(l => { dayMap[l.date] = l.total_seconds || 0; });
+    weekLogs.forEach(l => { if (dayMap[l.date]) dayMap[l.date].sec = l.total_seconds || 0; });
 
-    const workedDays = Object.values(dayMap).filter(s => s > 0).length;
-    const totalSec = Object.values(dayMap).reduce((a,b) => a+b, 0);
+    const workedDays = Object.values(dayMap).filter(d => d.sec > 0).length;
+    const totalSec = weekLogs.reduce((s,l) => s + (l.total_seconds||0), 0);
+    const totalTaskSec = weekLogs.reduce((s,l) => {
+      return s + (l.task_breakdown || []).reduce((ts,t) => ts + (t.seconds||0), 0);
+    }, 0);
     const avgPerWorkedDay = workedDays > 0 ? totalSec / workedDays : 0;
 
     // Category totals
     const catTotals = {};
+    const taskTotals = {};
     weekLogs.forEach(log => {
       Object.entries(log.cat_breakdown || {}).forEach(([cat, sec]) => {
         catTotals[cat] = (catTotals[cat] || 0) + sec;
       });
+      (log.task_breakdown || []).forEach(t => {
+        if (!taskTotals[t.name]) taskTotals[t.name] = { sec: 0, cat: t.cat };
+        taskTotals[t.name].sec += t.seconds || 0;
+      });
     });
-    const maxCatSec = Math.max(...Object.values(catTotals), 1);
-
-    // Week label
-    const weekLabel = `${monday.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${sunday.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`;
 
     el.innerHTML = '';
 
-    // ── HEADER STATS ──
-    const header = document.createElement('div');
-    header.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;';
+    const weekRangeLabel = monday.toLocaleDateString('en-GB',{day:'numeric',month:'long'}) +
+      ' – ' + sunday.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+    // ── STAT CARDS ──
+    const statGrid = document.createElement('div');
+    statGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;';
     const stats = [
-      { label: 'This week', val: fmtHours(totalSec), sub: weekLabel },
-      { label: 'Days worked', val: `${workedDays}/7`, sub: workedDays === 0 ? 'No data yet' : workedDays < 6 ? 'On track' : 'Full week' },
-      { label: 'Avg per day', val: workedDays > 0 ? fmtHours(avgPerWorkedDay) : '—', sub: 'Worked days only' },
-      { label: 'Categories', val: Object.keys(catTotals).length, sub: 'Active this week' },
+      { label:'Total tracked', val: fmtHours(totalSec), sub: weekRangeLabel, color:'#a78bfa' },
+      { label:'Task hours', val: fmtHours(totalTaskSec), sub:'Time on specific tasks', color:'#22c55e' },
+      { label:'Days worked', val: workedDays + '/7', sub: workedDays===0?'No data':workedDays<5?'Light week':'Full week', color:'#f59e0b' },
+      { label:'Avg / day', val: workedDays>0?fmtHours(avgPerWorkedDay):'—', sub:'Worked days only', color:'#38bdf8' },
+      { label:'Categories', val: Object.keys(catTotals).length, sub:'Active this week', color:'#ec4899' },
     ];
     stats.forEach(s => {
-      header.innerHTML += `
-        <div style="background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;">
+      statGrid.innerHTML += `
+        <div style="background:var(--bg1);border:1px solid var(--border);border-top:3px solid ${s.color};border-radius:var(--radius);padding:14px 16px;">
           <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">${s.label}</div>
-          <div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;margin-bottom:2px;">${s.val}</div>
+          <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;color:${s.color};margin-bottom:2px;">${s.val}</div>
           <div style="font-size:11px;color:var(--text3);">${s.sub}</div>
         </div>`;
     });
-    el.appendChild(header);
+    el.appendChild(statGrid);
+
+    if (workedDays === 0) {
+      el.innerHTML += '<div class="empty"><div class="empty-icon">📊</div>No data logged for this week yet.</div>';
+      return;
+    }
 
     // ── DAY BARS Mon–Sun ──
     const dayCard = document.createElement('div');
     dayCard.className = 'card';
-    dayCard.style.marginBottom = '16px';
-    dayCard.innerHTML = '<div class="section-title" style="margin-bottom:14px;">Mon — Sun</div>';
-
-    const maxDay = Math.max(...Object.values(dayMap), 1);
-    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    let barHtml = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:flex-end;">';
-    Object.entries(dayMap).forEach(([date, sec], i) => {
-      const pct = Math.round((sec / maxDay) * 100);
-      const isToday = date === toLocalDateStr(now);
-      const isFuture = date > toLocalDateStr(now);
-      const barColor = isFuture ? 'var(--border)' : isToday ? '#a78bfa' : 'var(--text3)';
-      barHtml += `
+    dayCard.style.marginBottom = '14px';
+    const maxDay = Math.max(...Object.values(dayMap).map(d=>d.sec), 1);
+    let barsHtml = '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Daily breakdown</div>';
+    barsHtml += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;">';
+    Object.values(dayMap).forEach(day => {
+      const pct = Math.round((day.sec / maxDay) * 100);
+      const isToday = day.date === toLocalDateStr(now);
+      const isFuture = day.date > toLocalDateStr(now);
+      const barCol = isFuture ? 'var(--bg3)' : isToday ? '#a78bfa' : day.sec > 0 ? '#6366f1' : 'var(--bg2)';
+      barsHtml += `
         <div style="text-align:center;">
-          <div style="height:60px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:5px;">
-            <div style="width:100%;border-radius:3px 3px 0 0;background:${barColor};height:${Math.max(pct,isFuture?3:sec>0?3:0)}%;min-height:${sec>0?4:0}px;transition:height 0.3s;"></div>
+          <div style="font-variant-numeric:tabular-nums;font-size:10px;color:var(--text3);margin-bottom:6px;min-height:14px;">${day.sec>0?fmtHours(day.sec):''}</div>
+          <div style="height:72px;display:flex;align-items:flex-end;justify-content:center;">
+            <div style="width:100%;border-radius:4px 4px 0 0;background:${barCol};height:${Math.max(pct,day.sec>0?4:0)}%;transition:height 0.3s;"></div>
           </div>
-          <div style="font-size:11px;color:${isToday?'#a78bfa':isFuture?'var(--text3)':'var(--text2)'};font-weight:${isToday?'600':'400'};">${dayNames[i]}</div>
-          <div style="font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;margin-top:1px;">${sec>0?fmtHours(sec):''}</div>
+          <div style="font-size:12px;color:${isToday?'#a78bfa':isFuture?'var(--text3)':'var(--text2)'};font-weight:${isToday?700:400};margin-top:5px;">${day.label}</div>
         </div>`;
     });
-    barHtml += '</div>';
-    dayCard.innerHTML += barHtml;
-
-    if (workedDays === 0) {
-      dayCard.innerHTML += `<div style="text-align:center;padding:16px 0 4px;font-size:13px;color:var(--text3);">No data logged this week yet.</div>`;
-    }
+    barsHtml += '</div>';
+    dayCard.innerHTML = barsHtml;
     el.appendChild(dayCard);
-
-    if (workedDays === 0) return;
 
     // ── CATEGORY BREAKDOWN ──
     const catCard = document.createElement('div');
     catCard.className = 'card';
-    catCard.style.marginBottom = '16px';
-    catCard.innerHTML = '<div class="section-title" style="margin-bottom:14px;">Where your time went</div>';
-
-    Object.entries(catTotals).sort((a,b) => b[1]-a[1]).forEach(([cat, sec]) => {
+    catCard.style.marginBottom = '14px';
+    catCard.innerHTML = '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Category breakdown</div>';
+    const maxCat = Math.max(...Object.values(catTotals), 1);
+    Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).forEach(([cat, sec]) => {
       const color = app.categories[cat] || '#666';
       const target = app.catTargets[cat];
-      const targetSec = target && target.weekly ? (parseFloat(target.weekly) * 3600) : 0;
-      const pct = targetSec > 0 ? Math.min(100, (sec/targetSec)*100) : (sec/maxCatSec)*100;
-      const hit = targetSec > 0 && sec >= targetSec;
-      const over = targetSec > 0 && sec > targetSec * 1.1;
-      const barColor = targetSec === 0 ? color : hit ? '#22c55e' : '#ef4444';
-      const pctOfTotal = totalSec > 0 ? Math.round((sec/totalSec)*100) : 0;
+      const targetSec = target && target.weekly ? parseFloat(target.weekly)*3600 : 0;
+      const pct = targetSec>0 ? Math.min(100,(sec/targetSec)*100) : (sec/maxCat)*100;
+      const hit = targetSec>0 && sec>=targetSec;
+      const over = targetSec>0 && sec>targetSec*1.05;
+      const pctOfTotal = totalSec>0 ? Math.round((sec/totalSec)*100) : 0;
+      const barColor = targetSec===0 ? color : hit ? '#22c55e' : '#ef4444';
+      const statusText = targetSec===0 ? '' : hit ? `✓ hit ${fmtHours(targetSec)} target` :
+        over ? `⚠ ${fmtHours(sec-targetSec)} over` : `✗ ${fmtHours(targetSec-sec)} short`;
 
       catCard.innerHTML += `
-        <div style="margin-bottom:12px;">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
-            <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text);">
-              <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};"></span>
-              ${cat}
-              <span style="font-size:11px;color:var(--text3);">${pctOfTotal}% of week</span>
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:8px;">
+            <div style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text);min-width:0;">
+              <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block;"></span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cat}</span>
+              <span style="font-size:11px;color:var(--text3);font-weight:400;flex-shrink:0;">${pctOfTotal}%</span>
             </div>
-            <div style="font-size:13px;font-variant-numeric:tabular-nums;color:${targetSec>0?(hit?'#22c55e':'#ef4444'):'var(--text2)'};">
-              ${fmtHours(sec)}${targetSec > 0 ? ` / ${fmtHours(targetSec)}` : ''}
-              ${targetSec > 0 ? (hit ? ' ✓' : ' ✗') : ''}
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--text);">${fmtHours(sec)}</span>
+              <span style="font-size:11px;color:${targetSec===0?'var(--text3)':hit?'#22c55e':'#ef4444'};">${statusText}</span>
             </div>
           </div>
-          <div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;">
+          <div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;">
             <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:4px;transition:width 0.4s;"></div>
           </div>
-          ${over ? `<div style="font-size:11px;color:#f59e0b;margin-top:3px;">⚠ ${fmtHours(sec - targetSec)} over target — worth reviewing why</div>` : ''}
         </div>`;
     });
     el.appendChild(catCard);
 
+    // ── TASK BREAKDOWN ──
+    if (Object.keys(taskTotals).length > 0) {
+      const taskCard = document.createElement('div');
+      taskCard.className = 'card';
+      taskCard.style.marginBottom = '14px';
+      taskCard.innerHTML = '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;">Task breakdown</div>';
+      const maxTask = Math.max(...Object.values(taskTotals).map(t=>t.sec), 1);
+      Object.entries(taskTotals).sort((a,b)=>b[1].sec-a[1].sec).forEach(([name, data]) => {
+        const color = app.categories[data.cat] || '#666';
+        const pct = (data.sec/maxTask)*100;
+        const taskTarget = (app.catTargets['__tasks__']||{});
+        const tId = Object.keys(app.tasks).find(id => app.tasks[id].name === name);
+        const tTarget = tId && taskTarget[tId] ? parseFloat(taskTarget[tId].weekly||0)*3600 : 0;
+        const hit = tTarget>0 && data.sec>=tTarget;
+        const statusText = tTarget>0 ? (hit?`✓ ${fmtHours(tTarget)}`:`✗ ${fmtHours(Math.abs(data.sec-tTarget))} ${data.sec<tTarget?'short':'over'}`) : '';
+        taskCard.innerHTML += `
+          <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+            <span style="flex:1;font-size:13px;color:var(--text2);">${name}</span>
+            <span style="font-size:10px;color:var(--text3);">${data.cat}</span>
+            <span style="font-size:11px;color:${tTarget>0?(hit?'#22c55e':'#ef4444'):'var(--text3)'};">${statusText}</span>
+            <span style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--text);min-width:42px;text-align:right;">${fmtHours(data.sec)}</span>
+          </div>`;
+      });
+      el.appendChild(taskCard);
+    }
+
     // ── INSIGHTS ──
     const insights = [];
-    const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
-    if (topCat) {
-      const pct = Math.round((topCat[1]/totalSec)*100);
-      insights.push(`<strong>${topCat[0]}</strong> took up ${pct}% of your week — ${pct > 50 ? 'heavily dominant, check if that was intentional' : 'your biggest category'}.`);
+    const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    const top = sorted[0];
+    if (top) {
+      const pct = Math.round((top[1]/totalSec)*100);
+      insights.push({ icon:'⏱', text:`<strong>${top[0]}</strong> dominated the week at ${pct}% of total time (${fmtHours(top[1])}).${pct>60?' Consider if that balance is right for your goals.':''}` });
     }
-    const wasteKey = Object.keys(catTotals).find(k => k.toLowerCase().includes('waste') || k.toLowerCase().includes('drift'));
+    // Missed targets
+    const missed = Object.entries(app.catTargets)
+      .filter(([cat,t]) => t.weekly && catTotals[cat]!==undefined && catTotals[cat] < parseFloat(t.weekly)*3600*0.85)
+      .map(([cat,t]) => ({ cat, short: parseFloat(t.weekly)*3600 - (catTotals[cat]||0) }));
+    missed.forEach(m => insights.push({ icon:'⚠', text:`<strong>${m.cat}</strong> was ${fmtHours(m.short)} short of its weekly target — is there a reason for that?` }));
+    // Over target
+    const over = Object.entries(app.catTargets)
+      .filter(([cat,t]) => t.weekly && catTotals[cat] && catTotals[cat] > parseFloat(t.weekly)*3600*1.1)
+      .map(([cat,t]) => ({ cat, extra: (catTotals[cat]||0) - parseFloat(t.weekly)*3600 }));
+    over.forEach(o => insights.push({ icon:'🔴', text:`<strong>${o.cat}</strong> ran ${fmtHours(o.extra)} over target — worth investigating why.` }));
+    // Waste/drift check
+    const wasteKey = Object.keys(catTotals).find(k=>k.toLowerCase().includes('waste')||k.toLowerCase().includes('drift'));
     if (wasteKey && catTotals[wasteKey] > 3600) {
-      insights.push(`<strong>${wasteKey}</strong>: ${fmtHours(catTotals[wasteKey])} logged — if this wasn't planned, it's worth investigating.`);
+      insights.push({ icon:'🚨', text:`<strong>${wasteKey}:</strong> ${fmtHours(catTotals[wasteKey])} logged this week. If unplanned, track what caused it.` });
     }
-    const missedTargets = Object.entries(app.catTargets)
-      .filter(([cat, t]) => t.weekly && catTotals[cat] !== undefined && catTotals[cat] < parseFloat(t.weekly)*3600*0.8)
-      .map(([cat]) => cat);
-    if (missedTargets.length) insights.push(`Targets missed by 20%+: <strong>${missedTargets.join(', ')}</strong>.`);
-    if (workedDays === 7) insights.push('You worked all 7 days this week. Make sure you are taking proper rest.');
-    if (workedDays <= 4 && totalSec > 0) insights.push(`Only ${workedDays} days worked — all your hours are concentrated. That's fine if intentional.`);
+    if (workedDays===7) insights.push({ icon:'💤', text:'You worked all 7 days. Make sure you are taking proper rest.' });
+    if (totalSec>0 && totalTaskSec<totalSec*0.6) insights.push({ icon:'📋', text:`Only ${Math.round((totalTaskSec/totalSec)*100)}% of your tracked time was assigned to specific tasks. Consider adding more tasks to get clearer data.` });
 
     if (insights.length) {
-      const insightCard = document.createElement('div');
-      insightCard.className = 'card';
-      insightCard.innerHTML = `<div class="section-title" style="margin-bottom:12px;">Insights</div>` +
-        insights.map(i => `<div style="font-size:13px;color:var(--text2);padding:8px 0;border-bottom:1px solid var(--border);line-height:1.5;">${i}</div>`).join('');
-      el.appendChild(insightCard);
+      const insCard = document.createElement('div');
+      insCard.className = 'card';
+      insCard.innerHTML = '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Insights</div>';
+      insights.forEach(ins => {
+        insCard.innerHTML += `
+          <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+            <span style="font-size:16px;flex-shrink:0;">${ins.icon}</span>
+            <span style="font-size:13px;color:var(--text2);line-height:1.5;">${ins.text}</span>
+          </div>`;
+      });
+      el.appendChild(insCard);
     }
+
+    // ── DAILY NOTES ──
+    const noteLogs = weekLogs.filter(l => l.notes);
+    if (noteLogs.length) {
+      const noteCard = document.createElement('div');
+      noteCard.className = 'card';
+      noteCard.innerHTML = '<div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Daily reflections</div>';
+      noteLogs.forEach(l => {
+        const d = new Date(l.date+'T12:00:00');
+        noteCard.innerHTML += `
+          <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">${d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})}</div>
+            <div style="font-size:13px;color:var(--text2);font-style:italic;">"${l.notes}"</div>
+          </div>`;
+      });
+      el.appendChild(noteCard);
+    }
+  }
+
+  function getISOWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
   }
 
   // ─── INIT ─────────────────────────────────────────────────────
