@@ -115,16 +115,20 @@
     .tab.active { color: var(--text); border-bottom-color: var(--text); }
 
     /* CONTENT */
-    .content { display: none; position: relative; overflow: visible; }
+    .content { display: none; }
+    .content.active { display: block; position: relative; }
     .content.active { display: block; }
 
     /* LOCK */
     .lock {
-      position: absolute; top: 0; left: 0; right: 0;
-      min-height: 340px;
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      min-height: 100%;
+      height: 100%;
       display: flex; align-items: center; justify-content: center;
       z-index: 100;
       background: var(--bg);
+      overflow: hidden;
     }
     .lock.hidden { display: none; }
     .lock-bg-glow {
@@ -690,7 +694,7 @@
   </div>
 
   <!-- TRACKER -->
-  <div id="tracker" class="content active">
+  <div id="tracker" class="content active" style="position:relative;min-height:500px;">
     <div class="lock" id="lock">
       <div class="lock-bg-glow"></div>
       <div class="lock-box">
@@ -1004,6 +1008,7 @@
     app.dayDate = today;
     LS.set('tt_day_date', today);
     document.getElementById('lock').classList.add('hidden');
+    document.getElementById('tracker').classList.add('day-active');
     document.getElementById('stop-day-btn').disabled = false;
     document.getElementById('pause-day-btn').disabled = false;
     document.getElementById('pause-day-btn').style.display = 'inline-block';
@@ -1131,6 +1136,7 @@
     app.currentTask = null;
     if (app.timerInt) { clearInterval(app.timerInt); app.timerInt = null; }
     document.getElementById('lock').classList.remove('hidden');
+    document.getElementById('tracker').classList.remove('day-active');
     document.getElementById('stop-day-btn').disabled = true;
     document.getElementById('pause-day-btn').disabled = true;
     document.getElementById('pause-day-btn').style.display = 'none';
@@ -1221,12 +1227,17 @@
       if (t.start_time) { anyRunning = true; app.currentTask = t.id; }
     });
 
-    if (anyRunning && !app.dayStarted) {
+    // Restore day state if dayDate is stored (day was started but not ended)
+    const dayActive = anyRunning || (app.dayDate !== null);
+    if (dayActive && !app.dayStarted) {
       app.dayStarted = true;
       document.getElementById('lock').classList.add('hidden');
+      document.getElementById('tracker').classList.add('day-active');
       document.getElementById('stop-day-btn').disabled = false;
-      document.getElementById('day-status').textContent = 'Day in progress';
-      startTicker();
+      document.getElementById('pause-day-btn').disabled = false;
+      document.getElementById('pause-day-btn').style.display = 'inline-block';
+      document.getElementById('day-status').textContent = anyRunning ? 'Day in progress' : 'Day started';
+      if (anyRunning) startTicker();
     }
 
     updateCatDropdown();
@@ -1349,7 +1360,7 @@
 
   function snapToGrid(px, py) {
     const cols = TILE_COLS();
-    const col = Math.max(0, Math.round(px / TILE_W));
+    const col = Math.max(0, Math.min(cols - 1, Math.round(px / TILE_W)));
     const row = Math.max(0, Math.round(py / TILE_H));
     return { x: col * TILE_W, y: row * TILE_H };
   }
@@ -1377,12 +1388,21 @@
     if (emptyEl) emptyEl.remove();
 
     // Assign positions to tasks that don't have one yet
+    // Also clamp any tiles that are off-screen
+    const containerW = document.getElementById('tiles').offsetWidth || 800;
+    const maxCols = Math.max(1, Math.floor(containerW / TILE_W));
     let needsSave = false;
     ids.forEach((id, idx) => {
       const t = app.tasks[id];
       if (t.x === undefined || t.y === undefined) {
-        const pos = gridPos(idx);
+        const pos = findNextEmptySlot();
         t.x = pos.x; t.y = pos.y;
+        needsSave = true;
+      }
+      // Clamp x to container bounds
+      const maxX = (maxCols - 1) * TILE_W;
+      if (t.x > maxX) {
+        t.x = maxX;
         needsSave = true;
       }
     });
