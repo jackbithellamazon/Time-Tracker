@@ -1227,17 +1227,17 @@
       if (t.start_time) { anyRunning = true; app.currentTask = t.id; }
     });
 
-    // Restore day state if dayDate is stored (day was started but not ended)
-    const dayActive = anyRunning || (app.dayDate !== null);
-    if (dayActive && !app.dayStarted) {
+    // Only restore day if a task is actively running (has start_time)
+    // dayDate alone is not enough — it may be stale from a previous ended day
+    if (anyRunning && !app.dayStarted) {
       app.dayStarted = true;
       document.getElementById('lock').classList.add('hidden');
       document.getElementById('tracker').classList.add('day-active');
       document.getElementById('stop-day-btn').disabled = false;
       document.getElementById('pause-day-btn').disabled = false;
       document.getElementById('pause-day-btn').style.display = 'inline-block';
-      document.getElementById('day-status').textContent = anyRunning ? 'Day in progress' : 'Day started';
-      if (anyRunning) startTicker();
+      document.getElementById('day-status').textContent = 'Day in progress';
+      startTicker();
     }
 
     updateCatDropdown();
@@ -1339,23 +1339,23 @@
   }
 
   function findNextEmptySlot() {
-    // Get all occupied grid slots
     const occupied = new Set();
     Object.values(app.tasks).forEach(t => {
-      if (t.x !== undefined && t.y !== undefined) {
-        occupied.add(t.x + ',' + t.y);
-      }
+      if (t.x !== undefined && t.y !== undefined) occupied.add(t.x + ',' + t.y);
     });
-    // Find first unoccupied slot
+    return findNextEmptySlotFrom(occupied);
+  }
+
+  function findNextEmptySlotFrom(occupied) {
     const cols = TILE_COLS() || 5;
-    for (let row = 0; row < 100; row++) {
+    for (let row = 0; row < 200; row++) {
       for (let col = 0; col < cols; col++) {
         const x = col * TILE_W;
         const y = row * TILE_H;
         if (!occupied.has(x + ',' + y)) return { x, y };
       }
     }
-    return { x: 0, y: Object.keys(app.tasks).length * TILE_H };
+    return { x: 0, y: 0 };
   }
 
   function snapToGrid(px, py) {
@@ -1387,24 +1387,27 @@
     const emptyEl = container.querySelector('.empty');
     if (emptyEl) emptyEl.remove();
 
-    // Assign positions to tasks that don't have one yet
-    // Also clamp any tiles that are off-screen
+    // Assign positions and resolve all collisions
     const containerW = document.getElementById('tiles').offsetWidth || 800;
     const maxCols = Math.max(1, Math.floor(containerW / TILE_W));
     let needsSave = false;
-    ids.forEach((id, idx) => {
+    const occupied = new Set();
+
+    ids.forEach((id) => {
       const t = app.tasks[id];
-      if (t.x === undefined || t.y === undefined) {
-        const pos = findNextEmptySlot();
+      // Clamp x to container bounds
+      if (t.x !== undefined && t.x > (maxCols - 1) * TILE_W) {
+        t.x = undefined; // force re-slot
+        needsSave = true;
+      }
+      // If no position or slot already taken, find next empty
+      const key = t.x + ',' + t.y;
+      if (t.x === undefined || t.y === undefined || occupied.has(key)) {
+        const pos = findNextEmptySlotFrom(occupied);
         t.x = pos.x; t.y = pos.y;
         needsSave = true;
       }
-      // Clamp x to container bounds
-      const maxX = (maxCols - 1) * TILE_W;
-      if (t.x > maxX) {
-        t.x = maxX;
-        needsSave = true;
-      }
+      occupied.add(t.x + ',' + t.y);
     });
     if (needsSave) saveTasks();
 
@@ -1506,10 +1509,20 @@
       tile.classList.remove('dragging');
       tile.style.zIndex = '';
       const snapped = snapToGrid(curX, curY);
-      t.x = snapped.x;
-      t.y = snapped.y;
-      tile.style.left = snapped.x + 'px';
-      tile.style.top = snapped.y + 'px';
+      // Check if target slot is occupied by another tile
+      const occupied = new Set();
+      Object.entries(app.tasks).forEach(([tid, task]) => {
+        if (tid !== id && task.x !== undefined) occupied.add(task.x + ',' + task.y);
+      });
+      let finalPos = snapped;
+      if (occupied.has(snapped.x + ',' + snapped.y)) {
+        // Slot taken — find nearest empty slot instead
+        finalPos = findNextEmptySlotFrom(occupied);
+      }
+      t.x = finalPos.x;
+      t.y = finalPos.y;
+      tile.style.left = finalPos.x + 'px';
+      tile.style.top = finalPos.y + 'px';
       saveTasks();
       updateContainerHeight();
       tile.removeEventListener('pointermove', onMove);
