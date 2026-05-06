@@ -906,6 +906,14 @@
     LS.set('tt_day_date', null);
   }
 
+  // ─── MIGRATION — force clean tile positions once ─────────────
+  if (!LS.get('tt_pos_reset_v2', false)) {
+    const tasks = LS.get('tt_tasks', {});
+    Object.values(tasks).forEach(t => { delete t.x; delete t.y; });
+    LS.set('tt_tasks', tasks);
+    LS.set('tt_pos_reset_v2', true);
+  }
+
   let app = {
     dayStarted: false,
     dayDate: null,
@@ -1387,20 +1395,26 @@
     const emptyEl = container.querySelector('.empty');
     if (emptyEl) emptyEl.remove();
 
-    // Assign positions and resolve all collisions
+    // Resolve all collisions cleanly
     const containerW = document.getElementById('tiles').offsetWidth || 800;
     const maxCols = Math.max(1, Math.floor(containerW / TILE_W));
-    let needsSave = false;
     const occupied = new Set();
+    let needsSave = false;
 
-    ids.forEach((id) => {
+    // Sort by position (top-left first) so earlier tiles keep their spots
+    const sorted = [...ids].sort((a, b) => {
+      const ta = app.tasks[a], tb = app.tasks[b];
+      const ay = ta.y ?? 9999, by = tb.y ?? 9999;
+      const ax = ta.x ?? 9999, bx = tb.x ?? 9999;
+      return ay !== by ? ay - by : ax - bx;
+    });
+
+    sorted.forEach((id) => {
       const t = app.tasks[id];
-      // Clamp x to container bounds
+      // Clamp x
       if (t.x !== undefined && t.x > (maxCols - 1) * TILE_W) {
-        t.x = undefined; // force re-slot
-        needsSave = true;
+        t.x = undefined; needsSave = true;
       }
-      // If no position or slot already taken, find next empty
       const key = t.x + ',' + t.y;
       if (t.x === undefined || t.y === undefined || occupied.has(key)) {
         const pos = findNextEmptySlotFrom(occupied);
