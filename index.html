@@ -907,11 +907,11 @@
   }
 
   // ─── MIGRATION — force clean tile positions once ─────────────
-  if (!LS.get('tt_pos_reset_v2', false)) {
+  if (!LS.get('tt_pos_reset_v3', false)) {
     const tasks = LS.get('tt_tasks', {});
     Object.values(tasks).forEach(t => { delete t.x; delete t.y; });
     LS.set('tt_tasks', tasks);
-    LS.set('tt_pos_reset_v2', true);
+    LS.set('tt_pos_reset_v3', true);
   }
 
   let app = {
