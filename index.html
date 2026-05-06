@@ -240,7 +240,7 @@
     }
     .tile {
       position: absolute;
-      width: 196px;
+      width: 200px;
       padding: 16px 18px 14px;
       border-radius: var(--radius);
       border: 1px solid transparent;
@@ -1337,8 +1337,8 @@
   }
 
   // ─── GRID CONSTANTS ───────────────────────────────────────────
-  const TILE_W = 212; // tile width + gap
-  const TILE_H = 194; // tile height + gap
+  const TILE_W = 212; // 200px tile + 12px gap
+  const TILE_H = 196; // 184px tile + 12px gap
   const TILE_COLS = () => Math.max(1, Math.floor((document.getElementById('tiles').offsetWidth + 12) / TILE_W));
 
   function gridPos(idx) {
